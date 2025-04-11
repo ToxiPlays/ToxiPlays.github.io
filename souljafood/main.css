@@ -1,0 +1,213 @@
+@property --margin-img-hover {       
+    syntax: "<percentage>";
+    inherits: true;
+    initial-value: 5%;
+}
+
+body {
+    margin: 15%;
+    background-color: beige;
+    text-align:  center;
+    font-family: math;
+}
+
+.disclaimer {
+    opacity: .5;
+    cursor: not-allowed;
+    transition: 3s;
+}
+
+.disclaimer:hover {
+    font-size: 110%;
+}
+
+a {
+    text-decoration-line: none;
+    color:rgb(147 23 63);
+    transition: 0.2s;
+}
+
+a:hover,
+a:focus {
+    text-decoration-line: underline;
+    font-size: 150%;
+}
+
+.links {
+    margin: 8%;
+    font-size: small;
+    position: relative; 
+}
+
+.links::before {
+    opacity: 1;
+    display: block;
+    content: "hover over me for more pages...";
+    font-style: italic;
+    transition: opacity 0.3s;
+}
+
+.links:hover::before {
+    opacity: 0;
+}
+
+.links:hover {
+    opacity: 1;
+    transition: opacity 0.8s;
+}
+
+.links > * { 
+    opacity: 0; /* Hide all child elements initially */
+    transition: opacity 0.8s;
+}
+
+.links:hover > * { 
+    opacity: 1; /* Show all child elements on hover */
+}
+
+img {
+    margin: 2%;
+    cursor: grabbing;
+    transition: 0.1s;
+}
+
+.right {
+    float: right;
+}
+
+.right:hover {
+    margin-right: var(--margin-img-hover);
+}
+
+.left {
+    float: left;
+}
+
+.left:hover {
+    margin-left: var(--margin-img-hover);
+}
+
+.cartInfo {
+    background-color: #ffc8c8;
+    position: relative;
+    width: 100vw;
+    height: 40px;
+    transition: .3s;
+    margin-left: calc(50% - 50vw); /* Negative margin to spill into left margin */
+    margin-right: calc(50% - 50vw); /* Negative margin to spill into right margin */
+    display: flex; /* Use Flexbox for alignment */
+    align-items: center; /* Vertically center the content */
+    justify-content: center; /* Optional: horizontally center the content */
+    cursor: pointer;
+}
+
+.cartInfo:hover {
+    height: 70px;
+}
+
+.cartInfo span {
+    display: block;
+    width: 100%;
+    font-weight: 0;
+}
+
+.cartInfo span:hover,
+.cartInfo span:focus {
+    font-weight: 1000;
+}
+
+.products {
+    display: flex;
+    grid-auto-flow: column;
+    gap: 2%;
+    overflow-x: auto;
+    flex-wrap: wrap;
+    padding: 2%;
+}
+
+.products > div {
+    flex: 1 1 22%; 
+    box-sizing: border-box;
+    text-align: center;
+}
+
+.products img {
+    cursor: pointer !important;
+    max-width: 600px;
+    max-height: 125px;
+    width: auto;
+    height: auto;
+}
+
+.cartButton {
+    width: 100%;
+    margin: 0 auto;
+    align-self: center;
+    background-color: #fff;
+    background-image: none;
+    background-position: 0 90%;
+    background-repeat: repeat no-repeat;
+    background-size: 4px 3px;
+    border-radius: 15px 225px 255px 15px 15px 255px 225px 15px;
+    border-style: solid;
+    border-width: 2px;
+    box-shadow: rgba(0, 0, 0, .2) 15px 28px 25px -18px;
+    box-sizing: border-box;
+    color: #41403e;
+    cursor: pointer;
+    display: inline-block;
+    font-family: Neucha, sans-serif;
+    font-size: 1rem;
+    line-height: 23px;
+    outline: none;
+    padding: .75rem;
+    text-decoration: none;
+    transition: all 235ms ease-in-out;
+    border-bottom-left-radius: 15px 255px;
+    border-bottom-right-radius: 225px 15px;
+    border-top-left-radius: 255px 15px;
+    border-top-right-radius: 15px 225px;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+}
+
+.cartButton:hover,
+.cartButton:focus {
+  box-shadow: rgba(0, 0, 0, .3) 2px 8px 8px -5px;
+  transform: translate3d(0, 2px, 0);
+}
+
+/* Modal container */
+.modal {
+    display: none; /* Hidden by default */
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.8); /* Black background with transparency */
+    justify-content: center; /* Centers horizontally */
+    align-items: center; /* Centers vertically */
+}
+
+/* Close button */
+.modal .close {
+    position: absolute;
+    top: 10px;
+    right: 25px;
+    color: white;
+    font-size: 35px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+/* Modal image */
+.modal-content {
+    max-width: 90%;
+    max-height: 90%;
+    margin: auto;
+    display: block;
+}
