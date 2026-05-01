@@ -959,7 +959,7 @@ document.getElementById('prev-btn').addEventListener('click', prevTrack);
 
 document.getElementById('next-btn').addEventListener('click', nextTrack);
 
-document.getElementById('shuffle-btn').addEventListener('click', () => {
+/*document.getElementById('shuffle-btn').addEventListener('click', () => {
     isShuffled = !isShuffled;
     document.getElementById('shuffle-btn').classList.toggle('active', isShuffled);
 });
@@ -970,7 +970,7 @@ document.getElementById('repeat-btn').addEventListener('click', () => {
     else repeatMode = 'none';
     document.getElementById('repeat-btn').textContent = `Repeat${repeatMode === "none" ? "" : ` ${repeatMode}`}`;
     document.getElementById('repeat-btn').classList.toggle('active', repeatMode !== 'none');
-});
+});*/
 
 document.getElementById('new-album-btn').addEventListener('click', () => {
     const album = { id: Date.now().toString(), title: 'New Album', cover: '', tracks: [] };
