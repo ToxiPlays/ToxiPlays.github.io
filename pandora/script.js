@@ -284,12 +284,18 @@ function renderAlbums() {
     container.innerHTML = '';
     document.getElementById("no-album-msg").classList.toggle('hidden', albums.length > 0);
     albums.forEach(album => {
+        const totalDuration = album.tracks
+            .filter(t => t.file && t.duration)
+            .reduce((sum, t) => sum + t.duration, 0);
+        
+        const durationStr = totalDuration > 0 ? ` (${formatTime(totalDuration)})` : '';
+        
         const card = document.createElement('div');
         card.className = 'album-card';
         card.innerHTML = `
             <img src="${album.cover || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiM5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5ObyBDb3ZlcjwvdGV4dD48L3N2Zz4='}" alt="Cover">
             <h3>${album.title}</h3>
-            <p>${album.tracks.length} tracks</p>
+            <p>${album.tracks.length} tracks${durationStr}</p>
             <button class="delete-album-btn hidden">Delete</button>
         `;
         card.addEventListener('click', (e) => {
@@ -362,7 +368,6 @@ function renderModalTracks() {
     const container = document.getElementById('modal-tracks-container');
     container.innerHTML = '';
     
-    // Check if all tracks are missing and album has 2+ tracks
     const allMissing = currentAlbum.tracks.every(t => !t.file);
     const massImportBtn = document.getElementById('mass-import-btn');
     if (allMissing && currentAlbum.tracks.length >= 2) {
@@ -377,11 +382,12 @@ function renderModalTracks() {
         item.className = `track-item${missing ? ' missing-track' : ''}`;
         item.draggable = !missing;
         item.title = missing ? 'Audio file missing. Restore the file to play or download this track.' : '';
+        const durationStr = track.duration ? formatTime(track.duration) : 'N/A';
         item.innerHTML = `
             <span class="track-number">${index + 1}.</span>
             <div class="track-details">
                 <div class="track-name">${track.name}${track.explicit ? ' <span class="explicit-badge">Explicit</span>' : ''}</div>
-                <div class="track-meta">Producers: ${track.producers || 'N/A'} | Writers: ${track.writers || 'N/A'}</div>
+                <div class="track-meta">${durationStr === "N/A" ? "" | `${durationStr} | `Producers: ${track.producers || 'N/A'} | Writers: ${track.writers || 'N/A'}</div>
                 ${track.tags ? `<div class="track-tags">${track.tags.map(tag => `<span class="tag ${tag.toLowerCase().replace(/\s+/g, '-')}">${tag}</span>`).join('')}</div>` : ''}
             </div>
             <div class="track-actions">
@@ -495,8 +501,10 @@ function playTrack(index) {
             loadDuration = Date.now() - loadStartTime;
             console.log(`Track loaded in ${loadDuration}ms`);
             wavesurfer.play();
+
+            const duration = wavesurfer.getDuration();
+            track.duration = duration;
             
-            // Set volume to the slider's current value
             const volumeValue = document.getElementById('volume-slider').value;
             wavesurfer.setVolume(volumeValue / 100);
             
