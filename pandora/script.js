@@ -607,8 +607,61 @@ function editTrack(index) {
     } else {
         nichtModeFields.classList.add('hidden');
     }
+
+    const fileNameEl = document.getElementById('current-file-name');
+    if (track.file) {
+        fileNameEl.textContent = `Current: ${track.originalName || 'Audio file'}`;
+    } else {
+        fileNameEl.textContent = 'No audio file';
+    }
     
     renderTagOptions(track.tags || []);
+
+    const fileInput = document.getElementById('track-file-upload');
+    const uploadBtn = document.getElementById('track-file-upload-btn');
+    
+    uploadBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        fileInput.click();
+    });
+    
+    fileInput.addEventListener('change', (e) => {
+        const newFile = e.target.files[0];
+        if (newFile) {
+            if (!newFile.type.startsWith('audio/')) {
+                alert('Please select a valid audio file');
+                return;
+            }
+            
+            if (track.fileKey) {
+                const tx = db.transaction(['files'], 'readwrite');
+                const store = tx.objectStore('files');
+                store.delete(track.fileKey);
+            }
+            
+            track.file = newFile;
+            track.originalName = newFile.name;
+            track.fileKey = track.fileKey || `${currentAlbum.id}-${track.id}`;
+            
+            storeFile(track.fileKey, newFile);
+            
+            const tempWs = WaveSurfer.create({
+                container: document.createElement('div'),
+                height: 1
+            });
+            const url = URL.createObjectURL(newFile);
+            tempWs.load(url);
+            tempWs.on('ready', () => {
+                track.duration = tempWs.getDuration();
+                tempWs.destroy();
+                saveToStorage();
+                fileNameEl.textContent = `Current: ${newFile.name}`;
+            });
+            
+            fileInput.value = '';
+        }
+    });
+    
     document.getElementById('track-modal').classList.remove('hidden');
     document.getElementById('track-modal').classList.add('show');
     document.getElementById('track-form').onsubmit = async (e) => {
