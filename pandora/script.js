@@ -387,7 +387,7 @@ function renderModalTracks() {
             <span class="track-number">${index + 1}.</span>
             <div class="track-details">
                 <div class="track-name">${track.name}${track.explicit ? ' <span class="explicit-badge">Explicit</span>' : ''}</div>
-                <div class="track-meta">${durationStr === "N/A" ? "" | `${durationStr} | `}Producers: ${track.producers || 'N/A'} | Writers: ${track.writers || 'N/A'}</div>
+                <div class="track-meta">${durationStr === "N/A" ? "" | durationStr + " | "}Producers: ${track.producers || 'N/A'} | Writers: ${track.writers || 'N/A'}</div>
                 ${track.tags ? `<div class="track-tags">${track.tags.map(tag => `<span class="tag ${tag.toLowerCase().replace(/\s+/g, '-')}">${tag}</span>`).join('')}</div>` : ''}
             </div>
             <div class="track-actions">
