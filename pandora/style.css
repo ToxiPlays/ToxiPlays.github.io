@@ -609,3 +609,22 @@ button.active {
     text-align: center;
     font-style: italic;
 }
+
+
+#track-file-info {
+    background: var(--color-background-secondary);
+    padding: 10px;
+    border-radius: 5px;
+    font-size: 13px;
+    color: var(--color-text-secondary);
+}
+
+.track-file-btn {
+    background-color: #17a2b8;
+    margin: 10px 0;
+    width: 100%;
+}
+
+.track-file-btn:hover {
+    background-color: #138496;
+}
