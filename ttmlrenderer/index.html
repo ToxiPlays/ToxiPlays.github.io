@@ -76,7 +76,7 @@
         <select id="filter-platform" class="filter-select">
           <option value="">All</option>
           <option value="pc">PC</option>
-          <option value="mobile">Mobile/PC</option>
+          <option value="mobile">Mobile</option>
         </select>
       </div>
       <button id="reset-filters" class="reset-btn">Reset Filters</button>
@@ -458,7 +458,7 @@ function renderToolsList() {
       </div>
       <div class="tool-meta">
         ${tool.author ? `by <a href="${tool.authorUrl}" target="_blank" rel="noopener noreferrer">${tool.author}</a>` : ''}
-        <span class="platforms">${tool.platforms.map(p => p === 'mobile' ? '📱 Mobile/PC' : '🖥️ PC').join(' ')}</span>
+        <span class="platforms">${tool.platforms.map(p => p === 'mobile' ? '📱 Mobile' : '🖥️ PC').join(' ')}</span>
       </div>
       <p class="tool-description">${tool.description}</p>
       <a href="${tool.url}" target="_blank" rel="noopener noreferrer" class="tool-link">Visit Tool →</a>
