@@ -664,7 +664,6 @@
     position: fixed;
     inset: 0;
     z-index: 2050;
-    display: flex !important;
     align-items: center;
     justify-content: center;
     animation: fadeIn 0.2s ease-out;
