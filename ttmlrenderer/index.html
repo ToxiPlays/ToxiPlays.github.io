@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -32,6 +33,7 @@
       <div class="entry muted">Special thanks to <a href="https://github.com/Steve-xmh" target="_blank" rel="noopener noreferrer">SteveXMH</a> for the <a href="https://amll-ttml-tool.stevexmh.net/" target="_blank" rel="noopener noreferrer">AMLL TTML tool</a></div>
     </div>
   </div>
+  <button class="create-ttml-btn" id="btn-create-ttml" title="Create TTML">Create TTML</button>
   <button class="design-toggle" id="btn-design" title="Design Settings">
     <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3">
       <line x1="2" y1="3.5" x2="12" y2="3.5"></line>
@@ -43,6 +45,53 @@
     </svg>
   </button>
 </header>
+
+<!-- Create TTML Modal -->
+<div id="create-ttml-modal" class="modal" style="display: none;">
+  <div class="modal-overlay" id="modal-overlay"></div>
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>TTML Maker Tools</h2>
+      <button class="modal-close" id="modal-close">×</button>
+    </div>
+    
+    <div class="modal-controls">
+      <div class="filter-group">
+        <label>Filter by Complexity:</label>
+        <select id="filter-complexity" class="filter-select">
+          <option value="">All</option>
+          <option value="simple">Simple</option>
+          <option value="advanced">Advanced</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Filter by Support:</label>
+        <select id="filter-support" class="filter-select">
+          <option value="">All</option>
+          <option value="full">Full Support</option>
+          <option value="unknown">Unknown Support</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Filter by Platform:</label>
+        <select id="filter-platform" class="filter-select">
+          <option value="">All</option>
+          <option value="pc">PC</option>
+          <option value="mobile">Mobile/PC</option>
+        </select>
+      </div>
+      <button id="reset-filters" class="reset-btn">Reset Filters</button>
+    </div>
+
+    <div class="ttml-tools-list" id="ttml-tools-list">
+      <!-- Tools will be inserted here by JavaScript -->
+    </div>
+
+    <div class="modal-footer">
+      <p>Get in contact with <a href="https://spicylyrics.org/toxi" target="_blank" rel="noopener noreferrer">@toxi</a> if you know a TTML tool maker that should be mentioned here.</p>
+    </div>
+  </div>
+</div>
 
 <div class="upload-panel">
   <div class="drop-zone" id="ttml-drop">
@@ -297,5 +346,157 @@
 
   <button class="design-reset" id="design-reset">Reset to Defaults</button>
 </div>
+
+<script>
+const ttmlTools = [
+  {
+    name: 'AMLL TTML Tool',
+    url: 'https://amll-ttml-tool.stevexmh.net/',
+    author: 'Steve-XMH',
+    authorUrl: 'https://github.com/Steve-xmh',
+    complexity: 'advanced',
+    platforms: ['pc'],
+    support: 'full',
+    recommended: false,
+    description: 'TTMLRenderer was designed with .ttml exports from AMLL TTML Tool in mind. TTMLRenderer will display the lyrics sync, background/duet vocals, and names of songwriters added via Edit > Edit > Edit Lyrics Metadata. This is a very powerful tool—please reference the <a href="https://lyrprep.spicylyrics.org/guide" target="_blank" rel="noopener noreferrer">Spicy Lyrics tutorial</a> on how to use it effectively.'
+  },
+  {
+    name: 'Very Cool TTML Tool',
+    url: 'https://verycool-ttml-tool-trust.vercel.app/',
+    author: 'NaeNaeTart',
+    authorUrl: 'https://github.com/NaeNaeTart',
+    complexity: 'advanced',
+    platforms: ['pc'],
+    support: 'full',
+    recommended: true,
+    description: 'A fork of AMLL TTML Tool. Introduces quality-of-life features such as ignoring background vocals while syncing, less intensive preview panels, and automatic lyric text processing (File > Import lyrics > Import from plain text). Same support as AMLL TTML Tool.'
+  },
+  {
+    name: 'AMLL Editor BETA',
+    url: 'https://beta-editor.amll.dev/',
+    author: null,
+    authorUrl: null,
+    complexity: 'advanced',
+    platforms: ['pc'],
+    support: 'unknown',
+    recommended: false,
+    description: 'A rewrite by the same team behind AMLL TTML Tool. May have issues on non-Chromium browsers.'
+  },
+  {
+    name: 'streetle\'s AMLL TTML Tool English',
+    url: 'https://streetlegithub.github.io/amll-ttml-tool-english/',
+    author: 'streetle',
+    authorUrl: 'https://github.com/streetlegithub',
+    complexity: 'advanced',
+    platforms: ['pc'],
+    support: 'unknown',
+    recommended: false,
+    description: 'An outdated fork of AMLL TTML Tool. Fixes bugs related to audio desyncing for .MP3 playback.'
+  },
+  {
+    name: 'SyncLyrics',
+    url: 'https://ellinya19.github.io/SyncLyrics/',
+    author: 'Ellinya',
+    authorUrl: 'https://genius.com/Ellinya',
+    complexity: 'simple',
+    platforms: ['mobile', 'pc'],
+    support: 'full',
+    recommended: true,
+    description: 'An intuitive word/syllable syncing tool that exports to a TTMLRenderer-compatible .TTML file. TTMLRenderer will show main lyrics on the left, additional lyrics as duet vocals, and backing vocal as ad-libs under the nearest main line. Recommended for new users.'
+  },
+  {
+    name: 'TTMLRenderer Studio',
+    url: '/studio/',
+    author: null,
+    authorUrl: null,
+    complexity: 'simple',
+    platforms: ['mobile', 'pc'],
+    support: 'full',
+    recommended: true,
+    description: 'Stay tuned for a simple TTML maker built into TTMLRenderer that takes full advantage of the format. Until then, use one of the others. (WIP)'
+  }
+];
+
+function sortTools(tools) {
+  const supportOrder = { 'full': 0, 'unknown': 1 };
+  return [...tools].sort((a, b) => {
+    if (a.recommended !== b.recommended) return b.recommended ? 1 : -1;
+    return (supportOrder[a.support] || 2) - (supportOrder[b.support] || 2);
+  });
+}
+
+function filterTools() {
+  const complexityFilter = document.getElementById('filter-complexity').value;
+  const supportFilter = document.getElementById('filter-support').value;
+  const platformFilter = document.getElementById('filter-platform').value;
+
+  return ttmlTools.filter(tool => {
+    if (complexityFilter && tool.complexity !== complexityFilter) return false;
+    if (supportFilter && tool.support !== supportFilter) return false;
+    if (platformFilter && !tool.platforms.includes(platformFilter === 'mobile' ? 'mobile' : 'pc')) return false;
+    return true;
+  });
+}
+
+function renderToolsList() {
+  const filtered = filterTools();
+  const sorted = sortTools(filtered);
+  const container = document.getElementById('ttml-tools-list');
+  
+  if (sorted.length === 0) {
+    container.innerHTML = '<div class="no-results">No tools match your filters.</div>';
+    return;
+  }
+
+  container.innerHTML = sorted.map(tool => `
+    <div class="tool-card ${tool.recommended ? 'recommended' : ''}">
+      <div class="tool-header">
+        <a href="${tool.url}" target="_blank" rel="noopener noreferrer" class="tool-name">${tool.name}</a>
+        <div class="tool-badges">
+          ${tool.recommended ? '<span class="badge badge-recommended">⭐ Recommended</span>' : ''}
+          <span class="badge badge-complexity">${tool.complexity === 'simple' ? 'Simple' : 'Advanced'}</span>
+          <span class="badge badge-support">${tool.support === 'full' ? 'Full Support' : 'Unknown Support'}</span>
+        </div>
+      </div>
+      <div class="tool-meta">
+        ${tool.author ? `by <a href="${tool.authorUrl}" target="_blank" rel="noopener noreferrer">${tool.author}</a>` : ''}
+        <span class="platforms">${tool.platforms.map(p => p === 'mobile' ? '📱 Mobile/PC' : '🖥️ PC').join(' ')}</span>
+      </div>
+      <p class="tool-description">${tool.description}</p>
+      <a href="${tool.url}" target="_blank" rel="noopener noreferrer" class="tool-link">Visit Tool →</a>
+    </div>
+  `).join('');
+}
+
+document.getElementById('btn-create-ttml').addEventListener('click', () => {
+  document.getElementById('create-ttml-modal').style.display = 'flex';
+  renderToolsList();
+});
+
+document.getElementById('modal-close').addEventListener('click', () => {
+  document.getElementById('create-ttml-modal').style.display = 'none';
+});
+
+document.getElementById('modal-overlay').addEventListener('click', () => {
+  document.getElementById('create-ttml-modal').style.display = 'none';
+});
+
+document.getElementById('filter-complexity').addEventListener('change', renderToolsList);
+document.getElementById('filter-support').addEventListener('change', renderToolsList);
+document.getElementById('filter-platform').addEventListener('change', renderToolsList);
+
+document.getElementById('reset-filters').addEventListener('click', () => {
+  document.getElementById('filter-complexity').value = '';
+  document.getElementById('filter-support').value = '';
+  document.getElementById('filter-platform').value = '';
+  renderToolsList();
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && document.getElementById('create-ttml-modal').style.display !== 'none') {
+    document.getElementById('create-ttml-modal').style.display = 'none';
+  }
+});
+</script>
 </body>
 </html>
