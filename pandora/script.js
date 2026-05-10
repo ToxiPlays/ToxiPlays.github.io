@@ -117,6 +117,33 @@ function storeFile(key, file) {
     store.put(file, key);
 }
 
+// Map agent IDs (v1, v2, v3, etc.) to highlight colors
+const agentColors = {
+    v1: '#0087ff',      // Current (blue)
+    v2: '#ff1493',      // Hot pink
+    v3: '#6a0dad',      // Deep purple
+    v4: '#ffff99',      // Pastel yellow
+    v5: '#006400',      // Dark green
+    v6: '#8b4513',      // Brown
+};
+
+function getAgentColor(agent) {
+    if (agentColors[agent]) {
+        return agentColors[agent];
+    }
+    
+    // Extract version number and loop
+    const match = agent.match(/v(\d+)/);
+    if (match) {
+        const versionNum = parseInt(match[1]);
+        const colorArray = ['#0087ff', '#ff1493', '#6a0dad', '#ffff99', '#006400', '#8b4513'];
+        const loopedIndex = ((versionNum - 1) % colorArray.length);
+        return colorArray[loopedIndex];
+    }
+    
+    return '#0087ff'; // Default fallback
+}
+
 function loadTTML(ttmlKey) {
     getFile(ttmlKey).then(file => {
         if (file) {
@@ -137,28 +164,81 @@ function loadTTML(ttmlKey) {
                     paragraphs.forEach(p => {
                         const begin = p.getAttribute('begin');
                         const end = p.getAttribute('end');
+                        const agent = p.getAttribute('ttm:agent') || 'v1';
                         
                         if (begin && end) {
-                            const spans = p.querySelectorAll('span');
-                            const spanData = [];
+                            // Parse main spans and background spans separately
+                            const mainSpans = [];
+                            const bgSpans = [];
                             
-                            spans.forEach(span => {
-                                const spanBegin = span.getAttribute('begin');
-                                const spanEnd = span.getAttribute('end');
-                                if (spanBegin && spanEnd) {
-                                    spanData.push({
-                                        text: span.textContent,
-                                        begin: parseTimeToSeconds(spanBegin),
-                                        end: parseTimeToSeconds(spanEnd)
-                                    });
+                            for (let child of p.children) {
+                                if (child.tagName === 'span') {
+                                    if (child.getAttribute('ttm:role') === 'x-bg') {
+                                        // Extract spans from background role container
+                                        for (let bgChild of child.children) {
+                                            if (bgChild.tagName === 'span') {
+                                                const spanBegin = bgChild.getAttribute('begin');
+                                                const spanEnd = bgChild.getAttribute('end');
+                                                if (spanBegin && spanEnd) {
+                                                    bgSpans.push({
+                                                        text: bgChild.textContent,
+                                                        begin: parseTimeToSeconds(spanBegin),
+                                                        end: parseTimeToSeconds(spanEnd),
+                                                        isBackground: true
+                                                    });
+                                                }
+                                            }
+                                        }
+                                    } else if (!child.getAttribute('ttm:role')) {
+                                        // Regular main span
+                                        const spanBegin = child.getAttribute('begin');
+                                        const spanEnd = child.getAttribute('end');
+                                        if (spanBegin && spanEnd) {
+                                            mainSpans.push({
+                                                text: child.textContent,
+                                                begin: parseTimeToSeconds(spanBegin),
+                                                end: parseTimeToSeconds(spanEnd),
+                                                isBackground: false
+                                            });
+                                        }
+                                    }
                                 }
-                            });
+                            }
+                            
+                            // Combine spans
+                            const allSpans = [...mainSpans, ...bgSpans];
+                            
+                            // Get text preserving original spacing (no added spaces between non-separated spans)
+                            let mainText = '';
+                            for (let i = 0; i < mainSpans.length; i++) {
+                                const span = mainSpans[i];
+                                const nextSpan = mainSpans[i + 1];
+                                mainText += span.text;
+                                // Only add space if there was a space in the original XML
+                                // This is indicated by whether the next span follows immediately in source
+                                // For safety, we add space after each span except when followed by x-bg
+                                if (nextSpan || (bgSpans.length > 0 && i === mainSpans.length - 1)) {
+                                    mainText += ' ';
+                                }
+                            }
+                            mainText = mainText.trim();
+                            
+                            let bgText = '';
+                            for (let i = 0; i < bgSpans.length; i++) {
+                                bgText += bgSpans[i].text;
+                                if (i < bgSpans.length - 1) {
+                                    bgText += ' ';
+                                }
+                            }
                             
                             currentLyrics.push({
-                                text: p.textContent,
+                                mainText: mainText,
+                                bgText: bgText,
                                 begin: parseTimeToSeconds(begin),
                                 end: parseTimeToSeconds(end),
-                                spans: spanData
+                                mainSpans: mainSpans,
+                                bgSpans: bgSpans,
+                                agent: agent
                             });
                         }
                     });
@@ -180,48 +260,101 @@ function updateSyncedLyrics() {
     
     const currentTime = wavesurfer.getCurrentTime();
     
-    let currentLyric = null;
+    // Find all lyrics that should be displayed (not just the current one)
+    const displayedLyrics = [];
     for (const lyric of currentLyrics) {
         if (currentTime >= lyric.begin && currentTime < lyric.end) {
-            currentLyric = lyric;
-            break;
+            displayedLyrics.push(lyric);
         }
     }
     
-    const lyricsBox = document.getElementById('current-lyric');
+    const lyricsBox = document.getElementById('synced-lyrics');
+    const lyricsContainer = document.getElementById('current-lyric');
     
-    if (currentLyric) {
-        let currentSpanIndex = -1;
-        for (let i = 0; i < currentLyric.spans.length; i++) {
-            const span = currentLyric.spans[i];
-            if (currentTime >= span.begin && currentTime < span.end) {
-                currentSpanIndex = i;
-                break;
-            }
-        }
+    if (displayedLyrics.length === 0) {
+        lyricsContainer.innerHTML = '';
+        return;
+    }
+    
+    let html = '';
+    
+    // Render each displayed lyric line
+    displayedLyrics.forEach((currentLyric, lineIndex) => {
+        let lineHtml = '';
+        const highlightColor = getAgentColor(currentLyric.agent);
         
-        let html = '';
-        for (let i = 0; i < currentLyric.spans.length; i++) {
-            const spanData = currentLyric.spans[i];
+        // Render main spans
+        for (let i = 0; i < currentLyric.mainSpans.length; i++) {
+            const spanData = currentLyric.mainSpans[i];
             let style = '';
-            if (i < currentSpanIndex) {
-                style = 'color: #007bff;';
-            } else if (i === currentSpanIndex) {
+            
+            if (currentTime >= spanData.begin && currentTime < spanData.end) {
+                // Currently singing
                 const timeInSpan = currentTime - spanData.begin;
                 const spanDuration = spanData.end - spanData.begin;
                 const progress = Math.max(0, Math.min(1, timeInSpan / spanDuration));
                 const gradientPercent = (progress * 100).toFixed(2);
-                style = `background: linear-gradient(90deg, #007bff 0%, #007bff ${gradientPercent}%, #333 ${gradientPercent}%, #333 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;`;
+                style = `background: linear-gradient(90deg, ${highlightColor} 0%, ${highlightColor} ${gradientPercent}%, #333 ${gradientPercent}%, #333 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;`;
+            } else if (currentTime >= spanData.end) {
+                // Already sung
+                style = `color: ${highlightColor};`;
             } else {
+                // Upcoming
                 style = 'color: #333;';
             }
-            html += `<span style="${style}">${spanData.text}</span> `;
+            
+            lineHtml += `<span style="${style}">${spanData.text}</span>`;
+            
+            // Add space after span only if not immediately followed by background span without space in source
+            // Check if next element is main span (add space) or if bg spans exist
+            if (i < currentLyric.mainSpans.length - 1) {
+                lineHtml += ' ';
+            }
         }
         
-        lyricsBox.innerHTML = html;
-    } else {
-        lyricsBox.textContent = '';
-    }
+        // Render background spans (ad-libs) as smaller text
+        // ALWAYS add a space before ad-libs, even if TTML doesn't have one
+        if (currentLyric.bgSpans.length > 0) {
+            lineHtml += ' <span style="font-size: 0.75em; opacity: 0.85;">';
+            
+            for (let i = 0; i < currentLyric.bgSpans.length; i++) {
+                const spanData = currentLyric.bgSpans[i];
+                let style = '';
+                
+                if (currentTime >= spanData.begin && currentTime < spanData.end) {
+                    // Currently singing
+                    const timeInSpan = currentTime - spanData.begin;
+                    const spanDuration = spanData.end - spanData.begin;
+                    const progress = Math.max(0, Math.min(1, timeInSpan / spanDuration));
+                    const gradientPercent = (progress * 100).toFixed(2);
+                    style = `background: linear-gradient(90deg, ${highlightColor} 0%, ${highlightColor} ${gradientPercent}%, #333 ${gradientPercent}%, #333 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;`;
+                } else if (currentTime >= spanData.end) {
+                    // Already sung
+                    style = `color: ${highlightColor};`;
+                } else {
+                    // Upcoming
+                    style = 'color: #333;';
+                }
+                
+                lineHtml += `<span style="${style}">${spanData.text}</span>`;
+                
+                // Add space between background spans
+                if (i < currentLyric.bgSpans.length - 1) {
+                    lineHtml += ' ';
+                }
+            }
+            
+            lineHtml += '</span>';
+        }
+        
+        // Add line with appropriate styling
+        if (lineIndex > 0) {
+            html += '<br/>';
+        }
+        html += lineHtml;
+    });
+    
+    lyricsContainer.innerHTML = html;
 }
 
 function getFile(key) {
