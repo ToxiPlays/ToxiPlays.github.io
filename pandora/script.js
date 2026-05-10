@@ -122,7 +122,7 @@ const agentColors = {
     v1: '#0087ff',      // Current (blue)
     v2: '#ff1493',      // Hot pink
     v3: '#6a0dad',      // Deep purple
-    v4: '#ffff99',      // Pastel yellow
+    v4: '#c27210',      // Orange
     v5: '#006400',      // Dark green
     v6: '#8b4513',      // Brown
 };
