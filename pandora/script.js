@@ -234,6 +234,9 @@ function loadTTML(ttmlKey) {
                     console.error('Error processing TTML:', error);
                 }
             };
+            reader.onerror = (e) => {
+                console.error(`Error reading TTML file: ${e}`);
+            };
             reader.readAsText(file);
         }
     }).catch(() => {
