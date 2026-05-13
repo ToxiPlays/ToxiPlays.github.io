@@ -269,17 +269,20 @@ function updateSyncedLyrics() {
     
     // Render each displayed lyric line
     displayedLyrics.forEach((currentLyric, lineIndex) => {
-        let lineHtml = '';
         const highlightColor = getAgentColor(currentLyric.agent);
+        
+        // Add line with appropriate styling
+        if (lineIndex > 0) {
+            html += '<br/>';
+        }
         
         // Add agent name above the line if this is the first line from that agent on screen
         if (!agentsShownThisFrame.has(currentLyric.agent) && currentLyric.agentName) {
-            lineHtml += `<div style="font-size: 0.75em; font-weight: 300; opacity: 0.7; margin-bottom: 4px; color:${highlightColor}">${currentLyric.agentName}</div>`;
+            html += `<span style="display: block; font-size: 0.75em; font-weight: 300; opacity: 0.7; margin-bottom: 4px; color: ${highlightColor};">${currentLyric.agentName}</span>`;
             agentsShownThisFrame.add(currentLyric.agent);
         }
         
         // Render main line
-        let mainLineHtml = '';
         for (let i = 0; i < currentLyric.mainSpans.length; i++) {
             const spanData = currentLyric.mainSpans[i];
             let style = '';
@@ -299,19 +302,17 @@ function updateSyncedLyrics() {
                 style = 'color: #333;';
             }
             
-            mainLineHtml += `<span style="${style}">${spanData.text}</span>`;
+            html += `<span style="${style}">${spanData.text}</span>`;
             
             // Add space after span (preserve spacing from TTML)
             if (i < currentLyric.mainSpans.length - 1) {
-                mainLineHtml += ' ';
+                html += ' ';
             }
         }
         
-        lineHtml += mainLineHtml;
-        
         // Render background spans (ad-libs) as a separate, smaller line below
         if (currentLyric.bgSpans.length > 0) {
-            let bgLineHtml = '<div style="font-size: 0.75em; opacity: 0.85; margin-top: 6px;">';
+            html += '<br/><span style="display: block; font-size: 0.75em; opacity: 0.85; margin-top: 6px;">';
             
             for (let i = 0; i < currentLyric.bgSpans.length; i++) {
                 const spanData = currentLyric.bgSpans[i];
@@ -332,23 +333,16 @@ function updateSyncedLyrics() {
                     style = 'color: #333;';
                 }
                 
-                bgLineHtml += `<span style="${style}">${spanData.text}</span>`;
+                html += `<span style="${style}">${spanData.text}</span>`;
                 
                 // Add space between background spans
                 if (i < currentLyric.bgSpans.length - 1) {
-                    bgLineHtml += ' ';
+                    html += ' ';
                 }
             }
             
-            bgLineHtml += '</div>';
-            lineHtml += bgLineHtml;
+            html += '</span>';
         }
-        
-        // Add line with appropriate styling
-        if (lineIndex > 0) {
-            html += '<div style="margin-top: 12px;"></div>';
-        }
-        html += `<div>${lineHtml}</div>`;
     });
     
     lyricsContainer.innerHTML = html;
