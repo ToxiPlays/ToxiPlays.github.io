@@ -801,8 +801,7 @@ function editTrack(index) {
         const ttmlInput = document.getElementById('track-ttml');
         if (settings.nicheMode && ttmlInput.files.length > 0) {
             const ttmlFile = ttmlInput.files[0];
-            const cleanedFile = await stripTTMLBackgroundSpans(ttmlFile);
-            track.ttmlFile = cleanedFile;
+            track.ttmlFile = ttmlFile;
             track.ttmlKey = track.ttmlKey || `${currentAlbum.id}-${track.id}-ttml`;
             storeFile(track.ttmlKey, cleanedFile);
         }
