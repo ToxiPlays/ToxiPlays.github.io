@@ -158,6 +158,19 @@ function loadTTML(ttmlKey) {
                         return;
                     }
                     
+                    // Load agent names from metadata
+                    const agentNames = {};
+                    const agents = xmlDoc.querySelectorAll('ttm\\:agent, [*|id]');
+                    agents.forEach(agent => {
+                        const agentId = agent.getAttribute('xml:id');
+                        if (agentId) {
+                            const nameEl = agent.querySelector('ttm\\:name');
+                            if (nameEl) {
+                                agentNames[agentId] = nameEl.textContent.trim();
+                            }
+                        }
+                    });
+                    
                     const paragraphs = xmlDoc.querySelectorAll('p');
                     currentLyrics = [];
                     
@@ -167,78 +180,51 @@ function loadTTML(ttmlKey) {
                         const agent = p.getAttribute('ttm:agent') || 'v1';
                         
                         if (begin && end) {
-                            // Parse main spans and background spans separately
+                            // Parse child nodes preserving text nodes for proper spacing (syllable sync)
                             const mainSpans = [];
                             const bgSpans = [];
                             
-                            for (let child of p.children) {
-                                if (child.tagName === 'span') {
-                                    if (child.getAttribute('ttm:role') === 'x-bg') {
-                                        // Extract spans from background role container
-                                        for (let bgChild of child.children) {
+                            // Walk the DOM, collecting spans and text nodes to preserve spacing
+                            for (let node of p.childNodes) {
+                                if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'span') {
+                                    const spanBegin = node.getAttribute('begin');
+                                    const spanEnd = node.getAttribute('end');
+                                    
+                                    if (node.getAttribute('ttm:role') === 'x-bg') {
+                                        // This is an ad-lib wrapper - extract only direct span children
+                                        for (let bgChild of node.children) {
                                             if (bgChild.tagName === 'span') {
-                                                const spanBegin = bgChild.getAttribute('begin');
-                                                const spanEnd = bgChild.getAttribute('end');
-                                                if (spanBegin && spanEnd) {
+                                                const bgChildBegin = bgChild.getAttribute('begin');
+                                                const bgChildEnd = bgChild.getAttribute('end');
+                                                if (bgChildBegin && bgChildEnd) {
                                                     bgSpans.push({
                                                         text: bgChild.textContent,
-                                                        begin: parseTimeToSeconds(spanBegin),
-                                                        end: parseTimeToSeconds(spanEnd),
+                                                        begin: parseTimeToSeconds(bgChildBegin),
+                                                        end: parseTimeToSeconds(bgChildEnd),
                                                         isBackground: true
                                                     });
                                                 }
                                             }
                                         }
-                                    } else if (!child.getAttribute('ttm:role')) {
+                                    } else if (!node.getAttribute('ttm:role') && spanBegin && spanEnd) {
                                         // Regular main span
-                                        const spanBegin = child.getAttribute('begin');
-                                        const spanEnd = child.getAttribute('end');
-                                        if (spanBegin && spanEnd) {
-                                            mainSpans.push({
-                                                text: child.textContent,
-                                                begin: parseTimeToSeconds(spanBegin),
-                                                end: parseTimeToSeconds(spanEnd),
-                                                isBackground: false
-                                            });
-                                        }
+                                        mainSpans.push({
+                                            text: node.textContent,
+                                            begin: parseTimeToSeconds(spanBegin),
+                                            end: parseTimeToSeconds(spanEnd),
+                                            isBackground: false
+                                        });
                                     }
                                 }
                             }
                             
-                            // Combine spans
-                            const allSpans = [...mainSpans, ...bgSpans];
-                            
-                            // Get text preserving original spacing (no added spaces between non-separated spans)
-                            let mainText = '';
-                            for (let i = 0; i < mainSpans.length; i++) {
-                                const span = mainSpans[i];
-                                const nextSpan = mainSpans[i + 1];
-                                mainText += span.text;
-                                // Only add space if there was a space in the original XML
-                                // This is indicated by whether the next span follows immediately in source
-                                // For safety, we add space after each span except when followed by x-bg
-                                if (nextSpan || (bgSpans.length > 0 && i === mainSpans.length - 1)) {
-                                    mainText += ' ';
-                                }
-                            }
-                            mainText = mainText.trim();
-                            
-                            let bgText = '';
-                            for (let i = 0; i < bgSpans.length; i++) {
-                                bgText += bgSpans[i].text;
-                                if (i < bgSpans.length - 1) {
-                                    bgText += ' ';
-                                }
-                            }
-                            
                             currentLyrics.push({
-                                mainText: mainText,
-                                bgText: bgText,
-                                begin: parseTimeToSeconds(begin),
-                                end: parseTimeToSeconds(end),
                                 mainSpans: mainSpans,
                                 bgSpans: bgSpans,
-                                agent: agent
+                                begin: parseTimeToSeconds(begin),
+                                end: parseTimeToSeconds(end),
+                                agent: agent,
+                                agentName: agentNames[agent] || null
                             });
                         }
                     });
@@ -278,12 +264,22 @@ function updateSyncedLyrics() {
     
     let html = '';
     
+    // Track which agents we've shown names for on this screen
+    const agentsShownThisFrame = new Set();
+    
     // Render each displayed lyric line
     displayedLyrics.forEach((currentLyric, lineIndex) => {
         let lineHtml = '';
         const highlightColor = getAgentColor(currentLyric.agent);
         
-        // Render main spans
+        // Add agent name above the line if this is the first line from that agent on screen
+        if (!agentsShownThisFrame.has(currentLyric.agent) && currentLyric.agentName) {
+            lineHtml += `<div style="font-size: 0.75em; font-weight: 300; opacity: 0.7; margin-bottom: 4px; color:${highlightColor}">${currentLyric.agentName}</div>`;
+            agentsShownThisFrame.add(currentLyric.agent);
+        }
+        
+        // Render main line
+        let mainLineHtml = '';
         for (let i = 0; i < currentLyric.mainSpans.length; i++) {
             const spanData = currentLyric.mainSpans[i];
             let style = '';
@@ -303,19 +299,19 @@ function updateSyncedLyrics() {
                 style = 'color: #333;';
             }
             
-            lineHtml += `<span style="${style}">${spanData.text}</span>`;
+            mainLineHtml += `<span style="${style}">${spanData.text}</span>`;
             
-            // Add space after span only if not immediately followed by background span without space in source
-            // Check if next element is main span (add space) or if bg spans exist
+            // Add space after span (preserve spacing from TTML)
             if (i < currentLyric.mainSpans.length - 1) {
-                lineHtml += ' ';
+                mainLineHtml += ' ';
             }
         }
         
-        // Render background spans (ad-libs) as smaller text
-        // ALWAYS add a space before ad-libs, even if TTML doesn't have one
+        lineHtml += mainLineHtml;
+        
+        // Render background spans (ad-libs) as a separate, smaller line below
         if (currentLyric.bgSpans.length > 0) {
-            lineHtml += ' <span style="font-size: 0.75em; opacity: 0.85;">';
+            let bgLineHtml = '<div style="font-size: 0.75em; opacity: 0.85; margin-top: 6px;">';
             
             for (let i = 0; i < currentLyric.bgSpans.length; i++) {
                 const spanData = currentLyric.bgSpans[i];
@@ -336,22 +332,23 @@ function updateSyncedLyrics() {
                     style = 'color: #333;';
                 }
                 
-                lineHtml += `<span style="${style}">${spanData.text}</span>`;
+                bgLineHtml += `<span style="${style}">${spanData.text}</span>`;
                 
                 // Add space between background spans
                 if (i < currentLyric.bgSpans.length - 1) {
-                    lineHtml += ' ';
+                    bgLineHtml += ' ';
                 }
             }
             
-            lineHtml += '</span>';
+            bgLineHtml += '</div>';
+            lineHtml += bgLineHtml;
         }
         
         // Add line with appropriate styling
         if (lineIndex > 0) {
-            html += '<br/>';
+            html += '<div style="margin-top: 12px;"></div>';
         }
-        html += lineHtml;
+        html += `<div>${lineHtml}</div>`;
     });
     
     lyricsContainer.innerHTML = html;
