@@ -194,22 +194,24 @@ function loadTTML(ttmlKey) {
                                     
                                     if (node.getAttribute('ttm:role') === 'x-bg') {
                                         // This is an ad-lib wrapper - extract only direct span children
-                                        for (let bgChild of node.children) {
-                                            if (bgChild.tagName === 'span') {
-                                                const bgChildBegin = bgChild.getAttribute('begin');
-                                                const bgChildEnd = bgChild.getAttribute('end');
-                                                const nextNode = p.childNodes[i + 1];
-                                                const hasTrailingSpace = nextNode && nextNode.nodeType === Node.TEXT_NODE && /\s/.test(nextNode.textContent);
-                                                if (bgChildBegin && bgChildEnd) {
-                                                    bgSpans.push({
-                                                        text: bgChild.textContent,
-                                                        begin: parseTimeToSeconds(bgChildBegin),
-                                                        end: parseTimeToSeconds(bgChildEnd),
-                                                        isBackground: true,
-                                                        hasTrailingSpace: hasTrailingSpace
-                                                    });
-                                                }
+                                        const bgChildren = Array.from(node.children).filter(child => child.tagName === 'span');
+                                        for (let bgIdx = 0; bgIdx < bgChildren.length; bgIdx++) {
+                                            const bgChild = bgChildren[bgIdx];
+                                            const bgChildBegin = bgChild.getAttribute('begin');
+                                            const bgChildEnd = bgChild.getAttribute('end');
+                                            const nextBgSibling = bgChildren[bgIdx + 1];
+                                            const hasTrailingSpace = nextBgSibling !== undefined;
+                                            
+                                            if (bgChildBegin && bgChildEnd) {
+                                                bgSpans.push({
+                                                    text: bgChild.textContent,
+                                                    begin: parseTimeToSeconds(bgChildBegin),
+                                                    end: parseTimeToSeconds(bgChildEnd),
+                                                    isBackground: true,
+                                                    hasTrailingSpace: hasTrailingSpace
+                                                });
                                             }
+                                        }
                                         }
                                     } else if (!node.getAttribute('ttm:role') && spanBegin && spanEnd) {
                                         // Check if next sibling is a text node with whitespace
