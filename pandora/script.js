@@ -199,8 +199,8 @@ function loadTTML(ttmlKey) {
                                             const bgChild = bgChildren[bgIdx];
                                             const bgChildBegin = bgChild.getAttribute('begin');
                                             const bgChildEnd = bgChild.getAttribute('end');
-                                            const nextBgSibling = bgChildren[bgIdx + 1];
-                                            const hasTrailingSpace = nextBgSibling !== undefined;
+                                            const nextBgNode = node.childNodes[Array.from(node.childNodes).indexOf(bgChild) + 1];
+                                            const hasTrailingSpace = nextBgNode && nextBgNode.nodeType === Node.TEXT_NODE && /\s/.test(nextBgNode.textContent);
                                             
                                             if (bgChildBegin && bgChildEnd) {
                                                 bgSpans.push({
