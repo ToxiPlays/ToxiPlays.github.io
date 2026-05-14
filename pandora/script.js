@@ -806,7 +806,7 @@ function editTrack(index) {
             const ttmlFile = ttmlInput.files[0];
             track.ttmlFile = ttmlFile;
             track.ttmlKey = track.ttmlKey || `${currentAlbum.id}-${track.id}-ttml`;
-            storeFile(track.ttmlKey, cleanedFile);
+            storeFile(track.ttmlKey, ttmlFile);
         }
         
         renderModalTracks();
