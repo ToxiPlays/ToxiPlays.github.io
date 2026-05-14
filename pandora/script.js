@@ -186,7 +186,8 @@ function loadTTML(ttmlKey) {
                             const bgSpans = [];
                             
                             // Walk the DOM, collecting spans and text nodes to preserve spacing
-                            for (let node of p.childNodes) {
+                            for (let i = 0; i < p.childNodes.length; i++) {
+                                const node = p.childNodes[i];
                                 if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'span') {
                                     const spanBegin = node.getAttribute('begin');
                                     const spanEnd = node.getAttribute('end');
