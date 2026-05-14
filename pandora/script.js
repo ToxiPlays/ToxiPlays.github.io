@@ -160,13 +160,14 @@ function loadTTML(ttmlKey) {
                     
                     // Load agent names from metadata
                     const agentNames = {};
-                    const agents = xmlDoc.querySelectorAll('ttm\\:agent, [*|id]');
-                    agents.forEach(agent => {
+                    const agents = xmlDoc.getElementsByTagNameNS('http://www.w3.org/ns/ttml#metadata', 'agent');
+                    Array.from(agents).forEach(agent => {
                         const agentId = agent.getAttribute('xml:id');
                         if (agentId) {
-                            const nameEl = agent.querySelector('ttm\\:name');
+                            const nameEl = agent.getElementsByTagNameNS('http://www.w3.org/ns/ttml#metadata', 'name')[0];
                             if (nameEl) {
                                 agentNames[agentId] = nameEl.textContent.trim();
+                                console.log(`Found agent: ${agentId} = ${nameEl.textContent.trim()}`);
                             }
                         }
                     });
@@ -196,23 +197,30 @@ function loadTTML(ttmlKey) {
                                             if (bgChild.tagName === 'span') {
                                                 const bgChildBegin = bgChild.getAttribute('begin');
                                                 const bgChildEnd = bgChild.getAttribute('end');
+                                                const nextNode = p.childNodes[i + 1];
+                                                const hasTrailingSpace = nextNode && nextNode.nodeType === Node.TEXT_NODE && /\s/.test(nextNode.textContent);
                                                 if (bgChildBegin && bgChildEnd) {
                                                     bgSpans.push({
                                                         text: bgChild.textContent,
                                                         begin: parseTimeToSeconds(bgChildBegin),
                                                         end: parseTimeToSeconds(bgChildEnd),
-                                                        isBackground: true
+                                                        isBackground: true,
+                                                        hasTrailingSpace: hasTrailingSpace
                                                     });
                                                 }
                                             }
                                         }
                                     } else if (!node.getAttribute('ttm:role') && spanBegin && spanEnd) {
-                                        // Regular main span
+                                        // Check if next sibling is a text node with whitespace
+                                        const nextNode = p.childNodes[i + 1];
+                                        const hasTrailingSpace = nextNode && nextNode.nodeType === Node.TEXT_NODE && /\s/.test(nextNode.textContent);
+                                        
                                         mainSpans.push({
                                             text: node.textContent,
                                             begin: parseTimeToSeconds(spanBegin),
                                             end: parseTimeToSeconds(spanEnd),
-                                            isBackground: false
+                                            isBackground: false,
+                                            hasTrailingSpace: hasTrailingSpace
                                         });
                                     }
                                 }
@@ -308,7 +316,7 @@ function updateSyncedLyrics() {
             html += `<span style="${style}">${spanData.text}</span>`;
             
             // Add space after span (preserve spacing from TTML)
-            if (i < currentLyric.mainSpans.length - 1) {
+            if (spanData.hasTrailingSpace) {
                 html += ' ';
             }
         }
@@ -339,7 +347,7 @@ function updateSyncedLyrics() {
                 html += `<span style="${style}">${spanData.text}</span>`;
                 
                 // Add space between background spans
-                if (i < currentLyric.bgSpans.length - 1) {
+                if (spanData.hasTrailingSpace) {
                     html += ' ';
                 }
             }
