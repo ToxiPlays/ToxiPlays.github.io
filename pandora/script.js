@@ -212,7 +212,6 @@ function loadTTML(ttmlKey) {
                                                 });
                                             }
                                         }
-                                        }
                                     } else if (!node.getAttribute('ttm:role') && spanBegin && spanEnd) {
                                         // Check if next sibling is a text node with whitespace
                                         const nextNode = p.childNodes[i + 1];
