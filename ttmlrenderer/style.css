@@ -307,6 +307,7 @@
   }
   input[type="range"].seek::-webkit-slider-thumb {
     -webkit-appearance: none;
+    appearance: none;
     width: 12px;
     height: 12px;
     background: var(--accent);
@@ -448,7 +449,7 @@
     transition: border-color 0.15s, color 0.15s;
   }
   .btn-render:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
-  .btn-render:disabled { opacity: 0.3; cursor: not-allowed; }
+  .btn-render:disabled { opacity: 0.3; cursor: not-allowed; display: none; }
   .btn-render.rendering { border-color: var(--accent2); color: var(--accent2); animation: pulse 1s infinite; }
 
   /* Render progress overlay */
@@ -1050,20 +1051,37 @@
   }
   .design-color-row input[type="color"]::-webkit-color-swatch-wrapper { padding: 2px; }
   .design-color-row input[type="color"]::-webkit-color-swatch { border: none; }
-  .design-color-row input[type="text"].hex-input {
+  /* Standard design panel input (mono, dark bg, accented border) */
+  .design-panel .hex-input,
+  .design-panel .design-input {
     flex: 1;
     min-width: 0;
+    width: 100%;
     font-family: 'DM Mono', monospace;
-    font-size: 0.65rem;
-    letter-spacing: 0.08em;
+    font-size: 0.7rem;
+    letter-spacing: 0.02em;
     color: var(--text-bright);
     background: var(--bg);
     border: 1px solid var(--border);
-    padding: 0.3rem 0.5rem;
+    padding: 0.4rem 0.5rem;
     outline: none;
     transition: border-color 0.2s;
+    border-radius: 0;
   }
-  .design-color-row input[type="text"].hex-input:focus { border-color: var(--accent); }
+  .design-panel .hex-input:focus,
+  .design-panel .design-input:focus,
+  .design-panel .design-input:hover { 
+    border-color: var(--accent); 
+  }
+  
+  /* Remove number input spinners */
+  .design-input::-webkit-inner-spin-button, 
+  .design-input::-webkit-outer-spin-button { 
+    -webkit-appearance: none; 
+    appearance: none;
+    margin: 0; 
+  }
+  .design-input { -moz-appearance: textfield; appearance: none; }
 
   .design-reset {
     font-family: 'DM Mono', monospace;

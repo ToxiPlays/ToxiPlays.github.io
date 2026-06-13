@@ -14,7 +14,15 @@
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="lyrics.css">
 <link rel="stylesheet" href="overlap.css">
-<script src="main.js" defer></script>
+<script type="importmap">
+{
+  "imports": {
+    "mp4-muxer": "./node_modules/mp4-muxer/build/mp4-muxer.mjs",
+    "webm-muxer": "./node_modules/webm-muxer/build/webm-muxer.mjs"
+  }
+}
+</script>
+<script src="main.js?v=3" type="module" defer></script>
 <script src="fix-webm-duration.js"></script>
 <title>TTML Renderer</title>
 </head>
@@ -27,6 +35,7 @@
     <div class="contributors-menu" id="contributors-menu">
       <div class="contributors-menu-title">Contributors</div>
       <div class="entry"><a href="https://spicylyrics.org/toxi" target="_blank" rel="noopener noreferrer">@toxi</a> — base code</div>
+      <div class="entry"><a href="https://github.com/NaeNaeTart" target="_blank" rel="noopener noreferrer">NaeNaeTart</a> — high-performance offline rendering & quality modes</div>
       <div class="entry"><a href="https://genius.com/gooncave" target="_blank" rel="noopener noreferrer">alex</a> — color-changing code</div>
       <div class="entry"><a href="https://quuut.codes" target="_blank" rel="noopener noreferrer">quuut</a> — WebKit file upload fix</div>
       <div class="entry"><a href="https://github.com/yusitnikov" target="_blank" rel="noopener noreferrer">Yuri Sitnikov</a> — <a href="https://github.com/yusitnikov/fix-webm-duration" target="_blank" rel="noopener noreferrer">fix-webm-duration</a> library</div>
@@ -265,11 +274,43 @@
       </select>
     </div>
     <div class="design-group">
+      <label>Export Format</label>
+      <select id="export-format" class="design-select">
+        <option value="webm" selected>WebM (.webm)</option>
+        <option value="mp4">MP4 (.mp4)</option>
+      </select>
+    </div>
+    <div class="design-group">
       <label>Export Quality</label>
       <select id="export-quality" class="design-select">
+        <option value="ultra">Ultra (1920x1080 @ 60 FPS)</option>
         <option value="high">High (1280x720 @ 30 FPS)</option>
         <option value="balanced">Balanced (960x540 @ 30 FPS)</option>
         <option value="performance">Performance (854x480 @ 24 FPS)</option>
+        <option value="custom">Custom</option>
+      </select>
+    </div>
+    <div class="design-group" id="custom-quality-group" style="display:none;">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.5rem;">
+        <div>
+          <label style="font-size:0.6rem;text-transform:uppercase;letter-spacing:0.2em;color:var(--text-dim);margin-bottom:0.25rem;display:block;">Width</label>
+          <input type="number" id="custom-q-w" class="design-input" value="1280" min="16" max="3840">
+        </div>
+        <div>
+          <label style="font-size:0.6rem;text-transform:uppercase;letter-spacing:0.2em;color:var(--text-dim);margin-bottom:0.25rem;display:block;">Height</label>
+          <input type="number" id="custom-q-h" class="design-input" value="720" min="16" max="2160">
+        </div>
+        <div>
+          <label style="font-size:0.6rem;text-transform:uppercase;letter-spacing:0.2em;color:var(--text-dim);margin-bottom:0.25rem;display:block;">FPS</label>
+          <input type="number" id="custom-q-fps" class="design-input" value="30" min="1" max="120">
+        </div>
+      </div>
+    </div>
+    <div class="design-group" id="render-method-group">
+      <label>Render Method</label>
+      <select id="render-method" class="design-select">
+        <option value="fast" selected>Fast Encoder (WebCodecs)</option>
+        <option value="screen">Screen Recording (MediaRecorder)</option>
       </select>
     </div>
     <div class="design-group">
@@ -307,7 +348,7 @@
       <div id="fn-vars-panel" style="display:none;border:1px solid var(--border);border-top:none;background:var(--bg);">
         <div style="padding:0.4rem 0.6rem;font-size:0.52rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border);">Click a variable to insert it</div>
         <div id="fn-vars-list"></div>
-        <div style="padding:0.4rem 0.6rem;font-size:0.52rem;color:var(--text-dim);letter-spacing:0.03em;border-top:1px solid var(--border);">.webm is appended automatically</div>
+        <div style="padding:0.4rem 0.6rem;font-size:0.52rem;color:var(--text-dim);letter-spacing:0.03em;border-top:1px solid var(--border);">The extension is appended automatically</div>
       </div>
     </div>
   </div>
