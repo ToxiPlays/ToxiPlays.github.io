@@ -78,6 +78,12 @@
                             <!-- Tags will be populated here -->
                         </div>
                     </div>
+                    <label>Audio file:</label>
+                    <div id="track-file-info" style="margin-bottom: 10px; padding: 10px; background: #f9f9f9; border-radius: 5px;">
+                        <p id="current-file-name" style="margin: 0; font-size: 12px;">No audio file</p>
+                    </div>
+                    <input type="file" id="track-file-upload" accept="audio/*" class="hidden">
+                    <button type="button" id="track-file-upload-btn" class="track-file-btn">Replace Audio File</button>
                     <div id="niche-mode-fields" class="hidden">
                         <label for="track-ttml">Synced lyrics (.ttml):</label>
                         <input type="file" id="track-ttml" accept=".ttml">
@@ -144,8 +150,8 @@
                 <button id="prev-btn">Prev</button>
                 <button id="play-pause-btn">Pause</button>
                 <button id="next-btn">Next</button>
-                <button id="shuffle-btn">Shuffle</button>
-                <button id="repeat-btn">Repeat</button>
+                <!--<button id="shuffle-btn">Shuffle</button>
+                <button id="repeat-btn">Repeat</button>-->
             </div>
             <div id="player-bottom">
                 <div id="current-track-info"></div>

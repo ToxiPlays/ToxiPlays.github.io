@@ -117,6 +117,33 @@ function storeFile(key, file) {
     store.put(file, key);
 }
 
+// Map agent IDs (v1, v2, v3, etc.) to highlight colors
+const agentColors = {
+    v1: '#0087ff',      // Current (blue)
+    v2: '#ff1493',      // Hot pink
+    v3: '#6a0dad',      // Deep purple
+    v4: '#c27210',      // Orange
+    v5: '#006400',      // Dark green
+    v6: '#8b4513',      // Brown
+};
+
+function getAgentColor(agent) {
+    if (agentColors[agent]) {
+        return agentColors[agent];
+    }
+    
+    // Extract version number and loop
+    const match = agent.match(/v(\d+)/);
+    if (match) {
+        const versionNum = parseInt(match[1]);
+        const colorArray = ['#0087ff', '#ff1493', '#6a0dad', '#ffff99', '#006400', '#8b4513'];
+        const loopedIndex = ((versionNum - 1) % colorArray.length);
+        return colorArray[loopedIndex];
+    }
+    
+    return '#0087ff'; // Default fallback
+}
+
 function loadTTML(ttmlKey) {
     getFile(ttmlKey).then(file => {
         if (file) {
@@ -131,34 +158,83 @@ function loadTTML(ttmlKey) {
                         return;
                     }
                     
+                    // Load agent names from metadata
+                    const agentNames = {};
+                    const agents = xmlDoc.getElementsByTagNameNS('http://www.w3.org/ns/ttml#metadata', 'agent');
+                    Array.from(agents).forEach(agent => {
+                        const agentId = agent.getAttribute('xml:id');
+                        if (agentId) {
+                            const nameEl = agent.getElementsByTagNameNS('http://www.w3.org/ns/ttml#metadata', 'name')[0];
+                            if (nameEl) {
+                                agentNames[agentId] = nameEl.textContent.trim();
+                                console.log(`Found agent: ${agentId} = ${nameEl.textContent.trim()}`);
+                            }
+                        }
+                    });
+                    
                     const paragraphs = xmlDoc.querySelectorAll('p');
                     currentLyrics = [];
                     
                     paragraphs.forEach(p => {
                         const begin = p.getAttribute('begin');
                         const end = p.getAttribute('end');
+                        const agent = p.getAttribute('ttm:agent') || 'v1';
                         
                         if (begin && end) {
-                            const spans = p.querySelectorAll('span');
-                            const spanData = [];
+                            // Parse child nodes preserving text nodes for proper spacing (syllable sync)
+                            const mainSpans = [];
+                            const bgSpans = [];
                             
-                            spans.forEach(span => {
-                                const spanBegin = span.getAttribute('begin');
-                                const spanEnd = span.getAttribute('end');
-                                if (spanBegin && spanEnd) {
-                                    spanData.push({
-                                        text: span.textContent,
-                                        begin: parseTimeToSeconds(spanBegin),
-                                        end: parseTimeToSeconds(spanEnd)
-                                    });
+                            // Walk the DOM, collecting spans and text nodes to preserve spacing
+                            for (let i = 0; i < p.childNodes.length; i++) {
+                                const node = p.childNodes[i];
+                                if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'span') {
+                                    const spanBegin = node.getAttribute('begin');
+                                    const spanEnd = node.getAttribute('end');
+                                    
+                                    if (node.getAttribute('ttm:role') === 'x-bg') {
+                                        // This is an ad-lib wrapper - extract only direct span children
+                                        const bgChildren = Array.from(node.children).filter(child => child.tagName === 'span');
+                                        for (let bgIdx = 0; bgIdx < bgChildren.length; bgIdx++) {
+                                            const bgChild = bgChildren[bgIdx];
+                                            const bgChildBegin = bgChild.getAttribute('begin');
+                                            const bgChildEnd = bgChild.getAttribute('end');
+                                            const nextBgNode = node.childNodes[Array.from(node.childNodes).indexOf(bgChild) + 1];
+                                            const hasTrailingSpace = nextBgNode && nextBgNode.nodeType === Node.TEXT_NODE && /\s/.test(nextBgNode.textContent);
+                                            
+                                            if (bgChildBegin && bgChildEnd) {
+                                                bgSpans.push({
+                                                    text: bgChild.textContent,
+                                                    begin: parseTimeToSeconds(bgChildBegin),
+                                                    end: parseTimeToSeconds(bgChildEnd),
+                                                    isBackground: true,
+                                                    hasTrailingSpace: hasTrailingSpace
+                                                });
+                                            }
+                                        }
+                                    } else if (!node.getAttribute('ttm:role') && spanBegin && spanEnd) {
+                                        // Check if next sibling is a text node with whitespace
+                                        const nextNode = p.childNodes[i + 1];
+                                        const hasTrailingSpace = nextNode && nextNode.nodeType === Node.TEXT_NODE && /\s/.test(nextNode.textContent);
+                                        
+                                        mainSpans.push({
+                                            text: node.textContent,
+                                            begin: parseTimeToSeconds(spanBegin),
+                                            end: parseTimeToSeconds(spanEnd),
+                                            isBackground: false,
+                                            hasTrailingSpace: hasTrailingSpace
+                                        });
+                                    }
                                 }
-                            });
+                            }
                             
                             currentLyrics.push({
-                                text: p.textContent,
+                                mainSpans: mainSpans,
+                                bgSpans: bgSpans,
                                 begin: parseTimeToSeconds(begin),
                                 end: parseTimeToSeconds(end),
-                                spans: spanData
+                                agent: agent,
+                                agentName: agentNames[agent] || null
                             });
                         }
                     });
@@ -167,6 +243,9 @@ function loadTTML(ttmlKey) {
                 } catch (error) {
                     console.error('Error processing TTML:', error);
                 }
+            };
+            reader.onerror = (e) => {
+                console.error(`Error reading TTML file: ${e}`);
             };
             reader.readAsText(file);
         }
@@ -180,48 +259,106 @@ function updateSyncedLyrics() {
     
     const currentTime = wavesurfer.getCurrentTime();
     
-    let currentLyric = null;
+    // Find all lyrics that should be displayed (not just the current one)
+    const displayedLyrics = [];
     for (const lyric of currentLyrics) {
         if (currentTime >= lyric.begin && currentTime < lyric.end) {
-            currentLyric = lyric;
-            break;
+            displayedLyrics.push(lyric);
         }
     }
     
-    const lyricsBox = document.getElementById('current-lyric');
+    const lyricsBox = document.getElementById('synced-lyrics');
+    const lyricsContainer = document.getElementById('current-lyric');
     
-    if (currentLyric) {
-        let currentSpanIndex = -1;
-        for (let i = 0; i < currentLyric.spans.length; i++) {
-            const span = currentLyric.spans[i];
-            if (currentTime >= span.begin && currentTime < span.end) {
-                currentSpanIndex = i;
-                break;
-            }
+    if (displayedLyrics.length === 0) {
+        lyricsContainer.innerHTML = '';
+        return;
+    }
+    
+    let html = '';
+    
+    // Track which agents we've shown names for on this screen
+    const agentsShownThisFrame = new Set();
+    
+    // Render each displayed lyric line
+    displayedLyrics.forEach((currentLyric, lineIndex) => {
+        const highlightColor = getAgentColor(currentLyric.agent);
+        
+        // Add line with appropriate styling
+        if (lineIndex > 0) {
+            html += '<br/>';
         }
         
-        let html = '';
-        for (let i = 0; i < currentLyric.spans.length; i++) {
-            const spanData = currentLyric.spans[i];
+        // Add agent name above the line if this is the first line from that agent on screen
+        if (!agentsShownThisFrame.has(currentLyric.agent) && currentLyric.agentName) {
+            html += `<span style="display: block; font-size: 0.75em; font-weight: 300; opacity: 0.7; margin-bottom: 4px; color: ${highlightColor};">${currentLyric.agentName}</span>`;
+            agentsShownThisFrame.add(currentLyric.agent);
+        }
+        
+        // Render main line
+        for (let i = 0; i < currentLyric.mainSpans.length; i++) {
+            const spanData = currentLyric.mainSpans[i];
             let style = '';
-            if (i < currentSpanIndex) {
-                style = 'color: #007bff;';
-            } else if (i === currentSpanIndex) {
+            
+            if (currentTime >= spanData.begin && currentTime < spanData.end) {
+                // Currently singing
                 const timeInSpan = currentTime - spanData.begin;
                 const spanDuration = spanData.end - spanData.begin;
                 const progress = Math.max(0, Math.min(1, timeInSpan / spanDuration));
                 const gradientPercent = (progress * 100).toFixed(2);
-                style = `background: linear-gradient(90deg, #007bff 0%, #007bff ${gradientPercent}%, #333 ${gradientPercent}%, #333 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;`;
+                style = `background: linear-gradient(90deg, ${highlightColor} 0%, ${highlightColor} ${gradientPercent}%, #333 ${gradientPercent}%, #333 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;`;
+            } else if (currentTime >= spanData.end) {
+                // Already sung
+                style = `color: ${highlightColor};`;
             } else {
+                // Upcoming
                 style = 'color: #333;';
             }
-            html += `<span style="${style}">${spanData.text}</span> `;
+            
+            html += `<span style="${style}">${spanData.text}</span>`;
+            
+            // Add space after span (preserve spacing from TTML)
+            if (spanData.hasTrailingSpace) {
+                html += ' ';
+            }
         }
         
-        lyricsBox.innerHTML = html;
-    } else {
-        lyricsBox.textContent = '';
-    }
+        // Render background spans (ad-libs) as a separate, smaller line below
+        if (currentLyric.bgSpans.length > 0) {
+            html += '<br/><span style="display: block; font-size: 0.75em; opacity: 0.85; margin-top: 6px;">';
+            
+            for (let i = 0; i < currentLyric.bgSpans.length; i++) {
+                const spanData = currentLyric.bgSpans[i];
+                let style = '';
+                
+                if (currentTime >= spanData.begin && currentTime < spanData.end) {
+                    // Currently singing
+                    const timeInSpan = currentTime - spanData.begin;
+                    const spanDuration = spanData.end - spanData.begin;
+                    const progress = Math.max(0, Math.min(1, timeInSpan / spanDuration));
+                    const gradientPercent = (progress * 100).toFixed(2);
+                    style = `background: linear-gradient(90deg, ${highlightColor} 0%, ${highlightColor} ${gradientPercent}%, #333 ${gradientPercent}%, #333 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;`;
+                } else if (currentTime >= spanData.end) {
+                    // Already sung
+                    style = `color: ${highlightColor};`;
+                } else {
+                    // Upcoming
+                    style = 'color: #333;';
+                }
+                
+                html += `<span style="${style}">${spanData.text}</span>`;
+                
+                // Add space between background spans
+                if (spanData.hasTrailingSpace) {
+                    html += ' ';
+                }
+            }
+            
+            html += '</span>';
+        }
+    });
+    
+    lyricsContainer.innerHTML = html;
 }
 
 function getFile(key) {
@@ -284,12 +421,18 @@ function renderAlbums() {
     container.innerHTML = '';
     document.getElementById("no-album-msg").classList.toggle('hidden', albums.length > 0);
     albums.forEach(album => {
+        const totalDuration = album.tracks
+            .filter(t => t.file && t.duration)
+            .reduce((sum, t) => sum + t.duration, 0);
+        
+        const durationStr = totalDuration > 0 ? ` (${formatTime(totalDuration)})` : '';
+        
         const card = document.createElement('div');
         card.className = 'album-card';
         card.innerHTML = `
             <img src="${album.cover || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiM5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5ObyBDb3ZlcjwvdGV4dD48L3N2Zz4='}" alt="Cover">
             <h3>${album.title}</h3>
-            <p>${album.tracks.length} tracks</p>
+            <p>${album.tracks.length} tracks${durationStr}</p>
             <button class="delete-album-btn hidden">Delete</button>
         `;
         card.addEventListener('click', (e) => {
@@ -362,7 +505,6 @@ function renderModalTracks() {
     const container = document.getElementById('modal-tracks-container');
     container.innerHTML = '';
     
-    // Check if all tracks are missing and album has 2+ tracks
     const allMissing = currentAlbum.tracks.every(t => !t.file);
     const massImportBtn = document.getElementById('mass-import-btn');
     if (allMissing && currentAlbum.tracks.length >= 2) {
@@ -377,11 +519,12 @@ function renderModalTracks() {
         item.className = `track-item${missing ? ' missing-track' : ''}`;
         item.draggable = !missing;
         item.title = missing ? 'Audio file missing. Restore the file to play or download this track.' : '';
+        const durationStr = track.duration ? formatTime(track.duration) : 'N/A';
         item.innerHTML = `
             <span class="track-number">${index + 1}.</span>
             <div class="track-details">
                 <div class="track-name">${track.name}${track.explicit ? ' <span class="explicit-badge">Explicit</span>' : ''}</div>
-                <div class="track-meta">Producers: ${track.producers || 'N/A'} | Writers: ${track.writers || 'N/A'}</div>
+                <div class="track-meta">${durationStr === "N/A" ? "" : durationStr + " | "}Producers: ${track.producers || 'N/A'} | Writers: ${track.writers || 'N/A'}</div>
                 ${track.tags ? `<div class="track-tags">${track.tags.map(tag => `<span class="tag ${tag.toLowerCase().replace(/\s+/g, '-')}">${tag}</span>`).join('')}</div>` : ''}
             </div>
             <div class="track-actions">
@@ -495,8 +638,10 @@ function playTrack(index) {
             loadDuration = Date.now() - loadStartTime;
             console.log(`Track loaded in ${loadDuration}ms`);
             wavesurfer.play();
+
+            const duration = wavesurfer.getDuration();
+            track.duration = duration;
             
-            // Set volume to the slider's current value
             const volumeValue = document.getElementById('volume-slider').value;
             wavesurfer.setVolume(volumeValue / 100);
             
@@ -599,8 +744,61 @@ function editTrack(index) {
     } else {
         nichtModeFields.classList.add('hidden');
     }
+
+    const fileNameEl = document.getElementById('current-file-name');
+    if (track.file) {
+        fileNameEl.textContent = `Current: ${track.originalName || 'Audio file'}`;
+    } else {
+        fileNameEl.textContent = 'No audio file';
+    }
     
     renderTagOptions(track.tags || []);
+
+    const fileInput = document.getElementById('track-file-upload');
+    const uploadBtn = document.getElementById('track-file-upload-btn');
+    
+    uploadBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        fileInput.click();
+    });
+    
+    fileInput.addEventListener('change', (e) => {
+        const newFile = e.target.files[0];
+        if (newFile) {
+            if (!newFile.type.startsWith('audio/')) {
+                alert('Please select a valid audio file');
+                return;
+            }
+            
+            if (track.fileKey) {
+                const tx = db.transaction(['files'], 'readwrite');
+                const store = tx.objectStore('files');
+                store.delete(track.fileKey);
+            }
+            
+            track.file = newFile;
+            track.originalName = newFile.name;
+            track.fileKey = track.fileKey || `${currentAlbum.id}-${track.id}`;
+            
+            storeFile(track.fileKey, newFile);
+            
+            const tempWs = WaveSurfer.create({
+                container: document.createElement('div'),
+                height: 1
+            });
+            const url = URL.createObjectURL(newFile);
+            tempWs.load(url);
+            tempWs.on('ready', () => {
+                track.duration = tempWs.getDuration();
+                tempWs.destroy();
+                saveToStorage();
+                fileNameEl.textContent = `Current: ${newFile.name}`;
+            });
+            
+            fileInput.value = '';
+        }
+    });
+    
     document.getElementById('track-modal').classList.remove('hidden');
     document.getElementById('track-modal').classList.add('show');
     document.getElementById('track-form').onsubmit = async (e) => {
@@ -616,10 +814,9 @@ function editTrack(index) {
         const ttmlInput = document.getElementById('track-ttml');
         if (settings.nicheMode && ttmlInput.files.length > 0) {
             const ttmlFile = ttmlInput.files[0];
-            const cleanedFile = await stripTTMLBackgroundSpans(ttmlFile);
-            track.ttmlFile = cleanedFile;
+            track.ttmlFile = ttmlFile;
             track.ttmlKey = track.ttmlKey || `${currentAlbum.id}-${track.id}-ttml`;
-            storeFile(track.ttmlKey, cleanedFile);
+            storeFile(track.ttmlKey, ttmlFile);
         }
         
         renderModalTracks();
@@ -898,7 +1095,7 @@ document.getElementById('prev-btn').addEventListener('click', prevTrack);
 
 document.getElementById('next-btn').addEventListener('click', nextTrack);
 
-document.getElementById('shuffle-btn').addEventListener('click', () => {
+/*document.getElementById('shuffle-btn').addEventListener('click', () => {
     isShuffled = !isShuffled;
     document.getElementById('shuffle-btn').classList.toggle('active', isShuffled);
 });
@@ -909,7 +1106,7 @@ document.getElementById('repeat-btn').addEventListener('click', () => {
     else repeatMode = 'none';
     document.getElementById('repeat-btn').textContent = `Repeat${repeatMode === "none" ? "" : ` ${repeatMode}`}`;
     document.getElementById('repeat-btn').classList.toggle('active', repeatMode !== 'none');
-});
+});*/
 
 document.getElementById('new-album-btn').addEventListener('click', () => {
     const album = { id: Date.now().toString(), title: 'New Album', cover: '', tracks: [] };
