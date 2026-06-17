@@ -52,6 +52,7 @@ export function initUI() {
     const text = await file.text();
     parseTTML(text);
     checkReady();
+    updateCozyDisplayModeVisibility();
     ttmlInput.value = '';
   }
 
@@ -93,6 +94,18 @@ export function initUI() {
     }
   }
 
+  function hasCozyDuetLines() {
+    if (!state.lines.length) return false;
+    const agents = new Set(state.lines.map(l => l.agent || 'v1'));
+    return agents.size > 1;
+  }
+
+  function updateCozyDisplayModeVisibility() {
+    const cozyDisplayGroup = document.getElementById('cozy-display-group');
+    if (!cozyDisplayGroup) return;
+    cozyDisplayGroup.style.display = styleSelect.value === 'cozy' && hasCozyDuetLines() ? '' : 'none';
+  }
+
   // --- Controls ---
   btnPlay.addEventListener('click', () => {
     if (state.isPlaying) {
@@ -125,9 +138,12 @@ export function initUI() {
   const styleSelect = document.getElementById('export-style');
   const iyfSettings = document.getElementById('iyf-settings');
   const karaokeSettings = document.getElementById('karaoke-settings');
+  const cozySettings = document.getElementById('cozy-settings');
   styleSelect.addEventListener('change', () => {
     iyfSettings.style.display = styleSelect.value === 'inyourface' ? '' : 'none';
     karaokeSettings.style.display = styleSelect.value === 'karaoke' ? '' : 'none';
+    cozySettings.style.display = styleSelect.value === 'cozy' ? '' : 'none';
+    updateCozyDisplayModeVisibility();
     syncAppleMusicPreviewClass();
   });
 }
@@ -218,7 +234,7 @@ function initFilename() {
     const bothFilesLoaded = state.ttmlBaseName && state.audioBaseName;
     if (!hasTwoPercents || !bothFilesLoaded) { preview.style.display = 'none'; return; }
     const styleVal = document.getElementById('export-style')?.value || 'birdseye';
-    const typeMap  = { birdseye: 'scroll', karaoke: 'karaoke', inyourface: 'iyf', aml: 'aml' };
+    const typeMap  = { birdseye: 'scroll', karaoke: 'karaoke', inyourface: 'iyf', aml: 'aml', cozy: 'cozy' };
     const resolved = resolveFilename(typeMap[styleVal] || 'scroll', new Date());
     preview.textContent = '→ ' + resolved;
     preview.style.display = 'block';

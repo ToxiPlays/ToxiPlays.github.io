@@ -29,7 +29,7 @@
     font-style: normal;
     font-weight: 400;
     font-display: swap;
-    src: url(SF-Pro-Display-Regular.woff) format('woff');
+    src: url(/fonts/SF-Pro-Display-Regular.woff) format('woff');
   }
 
   @font-face {
@@ -37,7 +37,36 @@
     font-style: normal;
     font-weight: 700;
     font-display: swap;
-    src: url(SF-Pro-Display-Bold.woff) format('woff');
+    src: url(/fonts/SF-Pro-Display-Bold.woff) format('woff');
+  }
+
+  @font-face {
+    font-family: 'Pliant';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('fonts/Pliant-Regular.ttf') format('truetype');
+  }
+  @font-face {
+    font-family: 'Pliant';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('fonts/Pliant-Medium.ttf') format('truetype');
+  }
+  @font-face {
+    font-family: 'Pliant';
+    font-style: italic;
+    font-weight: 400;
+    font-display: swap;
+    src: url('fonts/Pliant-Italic.ttf') format('truetype');
+  }
+  @font-face {
+    font-family: 'Pliant';
+    font-style: italic;
+    font-weight: 500;
+    font-display: swap;
+    src: url('fonts/Pliant-MediumItalic.ttf') format('truetype');
   }
 
    /* latin-ext */

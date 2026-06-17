@@ -1,4 +1,4 @@
-export const APP_VERSION = '5.2.0';
+export const APP_VERSION = '6.1.0';
 export const FILENAME_KEY     = 'ttml-renderer-filename';
 export const FILENAME_DEFAULT = '[%EXT% %TYPEU% TTMLRenderer v%VER#%] %AUDIO% (%TIME24%)';
 export const EXPORT_QUALITY_KEY  = 'ttml-renderer-export-quality';

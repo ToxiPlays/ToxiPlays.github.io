@@ -269,8 +269,9 @@
       <select id="export-style" class="design-select">
         <option value="birdseye">TTML Birds-eye View</option>
         <option value="karaoke">Karaoke Lyric Video</option>
-        <option value="inyourface">In-Your-Face Lyrics</option>
+        <option value="cozy">Cozy Lyric Video</option>
         <option value="aml">AMLL Lyric Video</option>
+        <option value="inyourface">In-Your-Face Lyrics (deprecated)</option>
       </select>
     </div>
     <div class="design-group">
@@ -284,7 +285,7 @@
       <label>Export Quality</label>
       <select id="export-quality" class="design-select">
         <option value="ultra">Ultra (1920x1080 @ 60 FPS)</option>
-        <option value="high">High (1280x720 @ 30 FPS)</option>
+        <option value="high" selected>High (1280x720 @ 30 FPS)</option>
         <option value="balanced">Balanced (960x540 @ 30 FPS)</option>
         <option value="performance">Performance (854x480 @ 24 FPS)</option>
         <option value="custom">Custom</option>
@@ -380,6 +381,26 @@
         <input type="checkbox" id="iyf-show-progress" checked>
         <span>Show song progress bar</span>
       </label>
+    </div>
+  </div>
+
+  <!-- Cozy Settings (shown only when Cozy is selected) -->
+  <div class="design-section" id="cozy-settings" style="display:none;">
+    <div class="design-section-title">Cozy Settings</div>
+    <div class="design-group">
+      <label>Intro text</label>
+      <input type="text" id="cozy-intro" value="" style="
+          font-family:'DM Mono',monospace;font-size:0.62rem;letter-spacing:0.05em;
+          color:var(--text-bright);background:var(--bg);border:1px solid var(--border);
+          padding:0.4rem 0.5rem;outline:none;width:100%;transition:border-color 0.2s;
+        "placeholder="Song title, artist, etc.">
+    </div>
+    <div class="design-group" id="cozy-display-group" style="display:none">
+      <label>Display Mode (Duet TTML)</label>
+      <select id="cozy-display" class="design-select">
+        <option value="middle" selected>Middle-aligned</option>
+        <option value="ttml">TTML Side-by-side</option>
+      </select>
     </div>
   </div>
 

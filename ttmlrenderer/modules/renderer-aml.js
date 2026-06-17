@@ -110,14 +110,6 @@ export async function startAmlRender() {
         i++;
         if (/\s$/.test(segments[i - 1].text)) break;
       }
-      const wordBegin = run[0].span?.begin ?? 0;
-      const wordEnd   = run[run.length - 1].span?.end ?? wordBegin;
-      let wordOffsetX = 0;
-      for (const seg of run) {
-        seg.wordOffsetX = wordOffsetX; seg.wordW = runWidth;
-        seg.wordBegin = wordBegin; seg.wordEnd = wordEnd;
-        wordOffsetX += seg.width;
-      }
       units.push({ segs: run, width: runWidth, isSpace: false });
     }
     const rows = [];
@@ -145,6 +137,22 @@ export async function startAmlRender() {
     const fontSize = isAdlib ? ADLIB_FONT_SIZE : FONT_SIZE;
     const rows = wrapLineSegments(collectLineSegments(lineObj.el, lineSpans), fontSize);
     if (!rows.length) return null;
+    const flatSegs = rows.flatMap(row => row.segs);
+    for (let i = 0; i < flatSegs.length; i++) {
+      const seg = flatSegs[i];
+      if (!seg.span) continue;
+      let nextSpanIndex = -1;
+      for (let j = i + 1; j < flatSegs.length; j++) {
+        if (flatSegs[j].span) { nextSpanIndex = j; break; }
+      }
+      if (nextSpanIndex !== -1) {
+        seg.nextSpan = flatSegs[nextSpanIndex].span;
+        seg.hasSpaceAfter = flatSegs.slice(i + 1, nextSpanIndex).some(s => s.span === null && /\s/.test(s.text));
+      } else {
+        seg.nextSpan = null;
+        seg.hasSpaceAfter = false;
+      }
+    }
     const rowAdvance = fontSize + ROW_GAP;
     const totalH = fontSize + (rows.length - 1) * rowAdvance;
     return {
@@ -364,11 +372,11 @@ export async function startAmlRender() {
     ctx.globalAlpha = 1;
   }
 
-  function drawSegmentText(text, x, y, progress, baseColor, alpha, shouldGlow, metric, wordX, wordW, wordProgress) {
+  function drawSegmentText(text, x, y, progress, baseColor, alpha, shouldGlow, metric, wordX, wordW, wordProgress, fadeStop = 0.8) {
     if (wordX == null) wordX = x; if (wordW == null) wordW = metric.width; if (wordProgress == null) wordProgress = progress;
     const FEATHER = Math.max(wordW * 0.25, 18); const sweepFrontX = wordX + wordProgress * wordW; const sweptIntoSeg = sweepFrontX - x;
     if (shouldGlow && progress > 0 && progress < 1) {
-      const glowT = progress; let glowIntensity = glowT < 0.15 ? glowT / 0.15 : 1 - ((glowT - 0.15) / 0.85); glowIntensity = Math.max(0, glowIntensity);
+      const glowT = progress; let glowIntensity = glowT < 0.15 ? glowT / 0.15 : 1 - ((glowT - 0.15) / fadeStop); glowIntensity = Math.max(0, glowIntensity);
       metric._glowInnerBlur = 10 + 2 * glowIntensity; metric._glowInnerAlpha = 0.5 + 0.4 * glowIntensity;
       metric._glowOuterBlur = 30 * glowIntensity; metric._glowOuterAlpha = 0.4 * glowIntensity;
     }
@@ -387,7 +395,7 @@ export async function startAmlRender() {
         ctx.fillStyle = baseColor; ctx.shadowBlur = 0; ctx.fillText(char, -charW / 2, 0);
         const gradX1_local = (sweepFrontX - baselineX) / scale; const gradX0_local = (sweepFrontX - FEATHER - baselineX) / scale;
         if (sweepFrontX > letterX) {
-          ctx.save(); const localGrad = ctx.createLinearGradient(gradX0_local, 0, gradX1_local, 0); localGrad.addColorStop(0, COL_BRIGHT); localGrad.addColorStop(0.95, hexToRGBA(COL_BRIGHT, 0)); ctx.fillStyle = localGrad;
+          ctx.save(); const localGrad = ctx.createLinearGradient(gradX0_local, 0, gradX1_local, 0); localGrad.addColorStop(0, COL_BRIGHT); localGrad.addColorStop(fadeStop, hexToRGBA(COL_BRIGHT, 0)); ctx.fillStyle = localGrad;
           if (metric._glowInnerBlur) { ctx.shadowColor = hexToRGBA(COL_BRIGHT, metric._glowInnerAlpha); ctx.shadowBlur = metric._glowInnerBlur / scale; }
           ctx.fillText(char, -charW / 2, 0);
           if (metric._glowOuterBlur > 0.5) { ctx.shadowBlur = metric._glowOuterBlur / scale; ctx.shadowColor = hexToRGBA(COL_BRIGHT, metric._glowOuterAlpha); ctx.globalAlpha = alpha * (metric._glowOuterAlpha / 0.4); ctx.fillText(char, -charW / 2, 0); }
@@ -401,7 +409,7 @@ export async function startAmlRender() {
     if (wordProgress >= 1) { ctx.globalAlpha = alpha; ctx.fillStyle = COL_BRIGHT; ctx.fillText(text, x, y); ctx.shadowBlur = 0; return; }
     ctx.globalAlpha = alpha; ctx.fillStyle = baseColor; ctx.shadowBlur = 0; ctx.fillText(text, x, y);
     if (sweptIntoSeg > 0) {
-      const sweepGrad = ctx.createLinearGradient(sweepFrontX - FEATHER, 0, sweepFrontX, 0); sweepGrad.addColorStop(0, COL_BRIGHT); sweepGrad.addColorStop(0.8, hexToRGBA(COL_BRIGHT, 0));
+      const sweepGrad = ctx.createLinearGradient(sweepFrontX - FEATHER, 0, sweepFrontX, 0); sweepGrad.addColorStop(0, COL_BRIGHT); sweepGrad.addColorStop(fadeStop, hexToRGBA(COL_BRIGHT, 0));
       ctx.globalAlpha = alpha; ctx.fillStyle = sweepGrad; ctx.shadowBlur = 0; ctx.fillText(text, x, y); ctx.shadowBlur = 0;
     }
   }
@@ -425,9 +433,23 @@ export async function startAmlRender() {
         const span = seg.span; const progress = t < span.begin ? 0 : t >= span.end ? 1 : (t - span.begin) / Math.max(span.end - span.begin, 0.001);
         const baseColor = isPast ? COL_BRIGHT : (isActive ? COL_MID : COL_DIM); const yOffset = getSpanYOffset(span, t);
         const shouldGlow = !isAdlibRender && activeSpan === span && span.isLong; const segMetric = seg.metric || textCache.metrics(entry.fontSize, seg.text);
-        segMetric._spanDur = span.end - span.begin; const wordX = (seg.wordOffsetX != null) ? (xCursor - seg.wordOffsetX) : xCursor; const wordW = seg.wordW ?? seg.width;
-        const wBegin = seg.wordBegin ?? span.begin; const wEnd = seg.wordEnd ?? span.end; const wordProgress = t < wBegin ? 0 : t >= wEnd ? 1 : (t - wBegin) / Math.max(wEnd - wBegin, 0.001);
-        drawSegmentText(seg.text, xCursor, rowTop + entry.fontSize + yOffset, progress, baseColor, alpha, shouldGlow, segMetric, wordX, wordW, wordProgress);
+        segMetric._spanDur = span.end - span.begin;
+        const wordX = xCursor; const wordW = seg.width;
+        const isShortSpan = seg.text.trim().length <= 2 && seg.width < 40;
+        const wordProgress = isShortSpan ? Math.min(progress / 0.75, 1) : progress;
+        let fadeStop = 0.8;
+        if (!seg.nextSpan) {
+          fadeStop = 1;
+        } else if (seg.nextSpan.begin > span.end) {
+          fadeStop = 1;
+        } else if (!seg.hasSpaceAfter) {
+          fadeStop = 0.94;
+        } else if (isShortSpan) {
+          fadeStop = 1;
+        } else if (seg.text.trim().length >= 8) {
+          fadeStop = 0.97;
+        }
+        drawSegmentText(seg.text, xCursor, rowTop + entry.fontSize + yOffset, progress, baseColor, alpha, shouldGlow, segMetric, wordX, wordW, wordProgress, fadeStop);
         xCursor += seg.width;
       }
       rowTop += entry.rowAdvance;

@@ -190,7 +190,7 @@ export function parseTTML(xmlString) {
         if (s) s.lineEl = lineEl;
       });
       container.appendChild(lineEl);
-      state.lines.push({ el: lineEl, begin, end });
+      state.lines.push({ el: lineEl, begin, end, agent, isAdlib: false });
     }
 
     if (adlibTokens.some(t => t.type === 'span')) {
@@ -201,7 +201,7 @@ export function parseTTML(xmlString) {
       });
       const hasOverlap = adlibTokens.some(t => t.type === 'span' && t.text.includes(';'));
       container.appendChild(lineEl);
-      state.lines.push({ el: lineEl, begin, end, skipRetroactive: hasOverlap });
+      state.lines.push({ el: lineEl, begin, end, agent, isAdlib: true, skipRetroactive: hasOverlap });
     }
   });
 

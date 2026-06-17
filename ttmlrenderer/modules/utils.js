@@ -76,7 +76,7 @@ export function resolveFilename(type, now) {
   const pattern = document.getElementById('export-filename')?.value || FILENAME_DEFAULT;
   if (!now) now = new Date();
 
-  const typeMap = { scroll: 'Scroll', karaoke: 'Kar', iyf: 'IYF', aml: 'AMLL' };
+  const typeMap = { scroll: 'Scroll', karaoke: 'Kar', iyf: 'IYF', aml: 'AMLL', cozy: 'Cozy' };
   const typeStr = typeMap[type] || type;
 
   const pad2 = n => String(n).padStart(2, '0');
