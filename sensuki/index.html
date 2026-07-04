@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sensuki Writer</title>
+<meta name="title" content="Sensuki Writer">
+<meta name="description" content="Create dynamic fanfiction stories for Sensuki from the web. Not affiliated with Infini Fun or Erabit, YMMV.">
+<meta name="keywords" content="writer, writing, studio, webapp, fanfic, story, dynamic">
+<meta name="robots" content="index, follow">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="language" content="English">
+<meta name="author" content="toxi">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-text">
+      <span class="brand-title">Sensuki Story Writer</span>
+    </div>
+  </div>
+  <div class="topbar-actions">
+    <button class="btn btn-ghost" id="btn-import">Import</button>
+    <button class="btn btn-ghost" id="btn-export">Export</button>
+    <input type="file" id="file-input" accept=".txt" hidden>
+  </div>
+</header>
+
+<main class="workspace">
+  <section class="flow-pane" id="flow-pane">
+    <div class="flow-pane-header">
+      <h2>Story Flow</h2>
+      <span class="hint"</span>
+    </div>
+    <div class="flow-scroll" id="flow-scroll">
+      <div class="flow-canvas" id="flow-canvas"></div>
+    </div>
+  </section>
+
+  <section class="session-pane">
+    <nav class="tabs" id="tabs">
+      <button class="tab active" data-tab="project">Project</button>
+      <button class="tab" data-tab="preview">Preview</button>
+      <button class="tab" data-tab="settings">Settings</button>
+    </nav>
+
+    <div class="panel-body" id="panel-body">
+      <div class="panel-view active" data-view="project">
+        <div class="panel-view-header">
+          <h3>Project Script</h3>
+          <span class="hint">This stays in sync with the flowchart!</span>
+        </div>
+        <textarea id="project-text" class="project-textarea" spellcheck="false"></textarea>
+        <div class="panel-footer">
+          <button class="btn btn-primary" id="btn-apply-text">Apply Changes</button>
+          <span class="parse-status" id="parse-status"></span>
+        </div>
+      </div>
+
+      <div class="panel-view" data-view="preview">
+        <div class="panel-view-header">
+          <h3>Preview</h3>
+          <span class="hint">You should specify your intended characters in Settings!</span>
+        </div>
+        <div class="preview-window" id="preview-window" tabindex="0">
+          <div class="preview-log" id="preview-log"></div>
+          <div class="preview-choices" id="preview-choices"></div>
+          <div class="preview-advance" id="preview-advance">▾ click / enter to continue</div>
+        </div>
+        <div class="panel-footer">
+          <button class="btn btn-ghost" id="btn-restart-preview">↺ Restart</button>
+        </div>
+      </div>
+
+      <div class="panel-view" data-view="settings">
+        <div class="panel-view-header">
+          <h3>Character Settings</h3>
+          <span class="hint">This is specific to this tab. It will not affect the exported story.</span>
+        </div>
+        <form class="settings-form" id="settings-form">
+          <fieldset class="char-fieldset">
+            <legend>Character A</legend>
+            <label>Full name <input type="text" id="set-a-name" placeholder="e.g. Alpha"></label>
+            <label>Short name <input type="text" id="set-a-short" placeholder="e.g. A"></label>
+            <div class="radio-row">
+              <span class="radio-label">Sex</span>
+              <label><input type="radio" name="a-sex" value="Male"> Male</label>
+              <label><input type="radio" name="a-sex" value="Female"> Female</label>
+              <label><input type="radio" name="a-sex" value="Other"> Other</label>
+            </div>
+          </fieldset>
+          <fieldset class="char-fieldset">
+            <legend>Character B</legend>
+            <label>Full name <input type="text" id="set-b-name" placeholder="e.g. Beta"></label>
+            <label>Short name <input type="text" id="set-b-short" placeholder="e.g. B"></label>
+            <div class="radio-row">
+              <span class="radio-label">Sex</span>
+              <label><input type="radio" name="b-sex" value="Male"> Male</label>
+              <label><input type="radio" name="b-sex" value="Female"> Female</label>
+              <label><input type="radio" name="b-sex" value="Other"> Other</label>
+            </div>
+          </fieldset>
+        </form>
+        <div class="panel-footer">
+          <button class="btn btn-primary" id="btn-save-settings">Save Settings</button>
+        </div>
+      </div>
+
+      <div class="panel-view" data-view="editor">
+        <div class="panel-view-header">
+          <h3 id="editor-title">Edit Paragraph</h3>
+          <button class="icon-btn close-editor" id="btn-close-editor" title="Back to project">✕</button>
+        </div>
+
+        <div id="editor-paragraph">
+          <textarea id="editor-textarea" class="cell-textarea" placeholder="Write this line of the story…"></textarea>
+          <div class="chip-row">
+            <button class="chip" data-insert="{A}">Char A full <code>{A}</code></button>
+            <button class="chip" data-insert="{a}">Char A short <code>{a}</code></button>
+            <button class="chip" data-insert="{B}">Char B full <code>{B}</code></button>
+            <button class="chip" data-insert="{b}">Char B short <code>{b}</code></button>
+            <button class="chip" id="btn-magic-gender">Create gender-based conditional</button>
+          </div>
+          <div class="magic-row">
+            <!-- soon ... -->
+          </div>
+        </div>
+
+        <div id="editor-tag" style="display:none">
+          <label class="field-label">Tag name</label>
+          <input type="text" id="editor-tag-input" placeholder="e.g. Fluff">
+        </div>
+
+        <div class="panel-footer">
+          <button class="btn btn-primary" id="btn-save-cell">Done</button>
+        </div>
+      </div>
+
+    </div>
+  </section>
+</main>
+
+<div class="modal-backdrop" id="modal-choice">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>New Choice Branch</h3>
+      <button class="icon-btn" data-close-modal>✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-hint">You need to specify at least two choices. They'll all eventually merge back into the main story.</p>
+      <div id="choice-options-list"></div>
+      <button class="btn btn-ghost btn-small" id="btn-add-choice-option">+ Add Option</button>
+      <label class="field-label" style="margin-top:14px;">Merge point name</label>
+      <input type="text" id="choice-merge-name" placeholder="e.g. Merged1">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" data-close-modal>Cancel</button>
+      <button class="btn btn-primary" id="btn-confirm-choice">Create Choice</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-tag">
+  <div class="modal modal-small">
+    <div class="modal-header">
+      <h3>New Tag</h3>
+      <button class="icon-btn" data-close-modal>✕</button>
+    </div>
+    <div class="modal-body">
+      <label class="field-label">Tag name</label>
+      <input type="text" id="tag-name-input" placeholder="e.g. Fluff">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" data-close-modal>Cancel</button>
+      <button class="btn btn-primary" id="btn-confirm-tag">Create Tag</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-gender">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Gender-based conditional</h3>
+      <button class="icon-btn" data-close-modal>✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="radio-row">
+        <label><input type="radio" name="gender-target" value="a" checked> Character A</label>
+        <label><input type="radio" name="gender-target" value="b"> Character B</label>
+      </div>
+      <label class="field-label">If male</label>
+      <input type="text" id="gender-male-text" placeholder="Text here...">
+      <label class="field-label">If female</label>
+      <input type="text" id="gender-female-text" placeholder="Text here...">
+      <label class="field-label">If non-binary</label>
+      <input type="text" id="gender-other-text" placeholder="Text here...">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" data-close-modal>Cancel</button>
+      <button class="btn btn-primary" id="btn-confirm-gender">Insert</button>
+    </div>
+  </div>
+</div>
+
+<div class="context-menu" id="context-menu">
+  <button data-action="delete">Delete</button>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
