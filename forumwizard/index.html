@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Forum Wizard</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app_wrapper">
+  <div class="discussion_thread-thread_list" id="group_discussion">
+
+    <div class="group_title">
+      <div class="group_title-subject">
+        <h1 id="disc_title">Title</h1>
+      </div>
+      <div class="group_title-voting">
+        <div class="voting_links">
+          <a class="vote up" tabindex="-1">Upvote</a>
+          <span class="votes_total" id="disc_votes"></span>
+          <a class="vote down" tabindex="-1">Downvote</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="forum_post_container" id="forum_post_container">
+      <!-- app.js -->
+    </div>
+
+  </div>
+
+  <div class="config_panel">
+
+    <div class="config_tabs">
+      <button class="tab_btn active" data-tab="users">Users</button>
+      <button class="tab_btn" data-tab="posts">Posts</button>
+      <button class="tab_btn" data-tab="settings">Settings</button>
+    </div>
+
+    <div class="tab_content" id="tab_users">
+      <div class="tab_content-header">
+        <h3>Users</h3>
+        <button class="micro_button primary" id="btn_add_user">+ Add user</button>
+      </div>
+      <div class="user_list" id="user_list"><!-- app.js --></div>
+    </div>
+
+    <div class="tab_content" id="tab_posts" hidden>
+      <h3>Discussion Post</h3>
+      <div class="field_group">
+        <label for="post_title">Group title</label>
+        <input type="text" id="post_title" maxlength="200">
+      </div>
+      <div class="field_group">
+        <label for="post_user">Posted by</label>
+        <select id="post_user"></select>
+      </div>
+      <div class="field_group">
+        <label for="post_votes">Total votes <span class="hint"></span></label>
+        <input type="number" id="post_votes" placeholder="e.g. 6 or -3">
+      </div>
+      <div class="field_group">
+        <label for="post_body">Body <span class="hint">(Markdown supported)</span></label>
+        <textarea id="post_body" rows="6"></textarea>
+      </div>
+
+      <hr class="divider">
+
+      <div class="tab_content-header">
+        <h3>Replies</h3>
+        <button class="micro_button primary" id="btn_add_reply">+ Add reply</button>
+      </div>
+      <div class="reply_list" id="reply_list"><!-- app.js --></div>
+    </div>
+
+    <div class="tab_content" id="tab_settings" hidden>
+      <h3>Save &amp; Load</h3>
+      <div class="settings_row">
+        <button class="micro_button" id="btn_save_gfw">Save as .gfw</button>
+        <button class="micro_button" id="btn_load_gfw">Load .gfw</button>
+        <input type="file" id="file_load_gfw" accept=".gfw,application/json" hidden>
+      </div>
+
+      <hr class="divider">
+
+      <h3>Export</h3>
+      <div class="settings_row">
+        <button class="micro_button" id="btn_copy_image">Copy image to clipboard</button>
+        <button class="micro_button" id="btn_download_image">Save image to disk</button>
+      </div>
+      <p class="hint" id="export_status"></p>
+
+      <hr class="divider">
+
+      <h3>Reset</h3>
+      <div class="settings_row">
+        <button class="micro_button danger" id="btn_reset">Reset tool</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="modal_overlay" id="user_modal_overlay" hidden>
+  <div class="modal">
+    <h2 id="user_modal_title">Add user</h2>
+    <form id="user_form">
+      <div class="field_group">
+        <label for="user_avatar_url">Profile picture (URL)</label>
+        <input type="text" id="user_avatar_url" placeholder="https://…">
+      </div>
+      <div class="field_group">
+        <label for="user_avatar_file">…or upload a file</label>
+        <input type="file" id="user_avatar_file" accept="image/*">
+      </div>
+      <div class="field_group">
+        <label for="user_name">Display name <span class="required">*</span></label>
+        <input type="text" id="user_name" required>
+      </div>
+      <div class="field_group">
+        <label for="user_role">Role</label>
+        <select id="user_role">
+          <option value="contributor">Contributor</option>
+          <option value="verified_artist">Verified Artist</option>
+          <option value="transcriber">Transcriber</option>
+          <option value="editor">Editor</option>
+          <option value="mediator">Mediator</option>
+          <option value="moderator">Moderator</option>
+          <option value="staff">Staff</option>
+        </select>
+      </div>
+      <div class="field_group">
+        <label for="user_iq">IQ <span class="required">*</span></label>
+        <input type="number" id="user_iq" required value="0">
+      </div>
+      <div class="modal_actions">
+        <button type="button" class="micro_button" id="user_modal_cancel">Cancel</button>
+        <button type="submit" class="micro_button primary" id="user_modal_submit">Save user</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal_overlay" id="reply_modal_overlay" hidden>
+  <div class="modal">
+    <h2 id="reply_modal_title">Add reply</h2>
+    <form id="reply_form">
+      <div class="field_group">
+        <label for="reply_user">User</label>
+        <select id="reply_user"></select>
+      </div>
+      <div class="field_group">
+        <label for="reply_votes">Total votes <span class="hint"></span></label>
+        <input type="number" id="reply_votes" placeholder="e.g. 6 or -3">
+      </div>
+      <div class="field_group">
+        <label for="reply_body">Body <span class="hint">(Markdown supported)</span></label>
+        <textarea id="reply_body" rows="6"></textarea>
+      </div>
+      <div class="modal_actions">
+        <button type="button" class="micro_button" id="reply_modal_cancel">Cancel</button>
+        <button type="submit" class="micro_button primary" id="reply_modal_submit">Save reply</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/16.3.0/lib/marked.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.4.8/purify.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
