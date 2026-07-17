@@ -26,7 +26,8 @@ function defaultState() {
       title: "Title",
       userId: "u_default",
       votes: "",
-      body: "Hello world!"
+      body: "Hello world!",
+      timeAgo: "just now"
     },
     replies: []
   };
@@ -53,6 +54,11 @@ function formatIq(n) {
   return num.toLocaleString("en-US");
 }
 
+function getTimeAgoText(value) {
+  const text = value == null ? "" : String(value).trim();
+  return text || "just now";
+}
+
 function markdownToSafeHtml(raw) {
   const text = raw || "";
   let html;
@@ -67,12 +73,42 @@ function markdownToSafeHtml(raw) {
   return html;
 }
 
+function formatCompactVote(n) {
+  const num = Number(n);
+  if (!Number.isFinite(num)) return "";
+  if (num === 0) return "";
+
+  const abs = Math.abs(num);
+  let sign = num < 0 ? "-" : "+";
+
+  if (abs >= 1000000000) {
+    const value = abs / 1000000000;
+    const formatted = value >= 10 ? value.toFixed(0) : value.toFixed(1).replace(/\.0$/, "");
+    return `${sign}${formatted}B`;
+  }
+  if (abs >= 1000000) {
+    const value = abs / 1000000;
+    const formatted = value >= 10 ? value.toFixed(0) : value.toFixed(1).replace(/\.0$/, "");
+    return `${sign}${formatted}M`;
+  }
+  if (abs >= 1000) {
+    const value = abs / 1000;
+    const formatted = value >= 10 ? value.toFixed(0) : value.toFixed(1).replace(/\.0$/, "");
+    return `${sign}${formatted}K`;
+  }
+
+  if (sign === "-") { sign = "" }
+
+  return `${sign}${Math.trunc(num)}`;
+}
+
 function voteBadgeHtml(votes) {
   if (votes === "" || votes === null || votes === undefined) return "";
   const n = Number(votes);
   if (Number.isNaN(n) || n === 0) return "";
-  if (n > 0) return `<span class="votes_total upvote">+${n}</span>`;
-  return `<span class="votes_total downvote">${n}</span>`;
+  const text = formatCompactVote(n);
+  if (n > 0) return `<span class="votes_total upvote">${text}</span>`;
+  return `<span class="votes_total downvote">${text}</span>`;
 }
 
 function userBadgeHtml(user) {
@@ -104,7 +140,7 @@ function userBadgeHtml(user) {
     </div>`;
 }
 
-function postUnitHtml({ user, body, votes, isFirst, replyId }) {
+function postUnitHtml({ user, body, votes, isFirst, replyId, timeAgo }) {
   return `
     <div class="forum_post_unit" ${replyId ? `data-reply-id="${replyId}"` : `data-op="1"`}>
       <div class="forum_post-header">
@@ -119,7 +155,7 @@ function postUnitHtml({ user, body, votes, isFirst, replyId }) {
       </div>
       <div class="body">${markdownToSafeHtml(body)}</div>
       <div class="meta">
-        <span class="timeago">just now</span>
+        <span class="timeago">${escapeHtml(getTimeAgoText(timeAgo))}</span>
         ${replyId ? `<a class="destroy" data-delete-reply="${replyId}">Delete</a>` : ``}
       </div>
     </div>`;
@@ -144,7 +180,8 @@ function renderDiscussion() {
     user: getUser(state.post.userId),
     body: state.post.body,
     votes: state.post.votes,
-    isFirst: true
+    isFirst: true,
+    timeAgo: state.post.timeAgo
   });
 
   state.replies.forEach(r => {
@@ -152,7 +189,8 @@ function renderDiscussion() {
       user: getUser(r.userId),
       body: r.body,
       votes: r.votes,
-      replyId: r.id
+      replyId: r.id,
+      timeAgo: r.timeAgo
     });
   });
 
@@ -238,6 +276,7 @@ function renderPostsTab() {
   document.getElementById("post_title").value = state.post.title;
   document.getElementById("post_votes").value = state.post.votes;
   document.getElementById("post_body").value = state.post.body;
+  document.getElementById("post_time_ago").value = getTimeAgoText(state.post.timeAgo);
   populateUserSelect(document.getElementById("post_user"), state.post.userId);
 
   const replyList = document.getElementById("reply_list");
@@ -316,6 +355,10 @@ document.getElementById("post_votes").addEventListener("input", e => {
 });
 document.getElementById("post_body").addEventListener("input", e => {
   state.post.body = e.target.value;
+  renderDiscussion();
+});
+document.getElementById("post_time_ago").addEventListener("input", e => {
+  state.post.timeAgo = e.target.value;
   renderDiscussion();
 });
 
@@ -414,10 +457,12 @@ function openReplyModal(replyId) {
     document.getElementById("reply_modal_title").textContent = "Edit reply";
     document.getElementById("reply_votes").value = r.votes;
     document.getElementById("reply_body").value = r.body;
+    document.getElementById("reply_time_ago").value = getTimeAgoText(r.timeAgo);
   } else {
     document.getElementById("reply_modal_title").textContent = "Add reply";
     document.getElementById("reply_votes").value = "";
     document.getElementById("reply_body").value = "";
+    document.getElementById("reply_time_ago").value = "just now";
   }
   replyModalOverlay.hidden = false;
 }
@@ -436,12 +481,13 @@ replyForm.addEventListener("submit", e => {
   const userId = document.getElementById("reply_user").value;
   const votes = document.getElementById("reply_votes").value;
   const body = document.getElementById("reply_body").value;
+  const timeAgo = getTimeAgoText(document.getElementById("reply_time_ago").value);
 
   if (editingReplyId) {
     const r = state.replies.find(rr => rr.id === editingReplyId);
-    r.userId = userId; r.votes = votes; r.body = body;
+    r.userId = userId; r.votes = votes; r.body = body; r.timeAgo = timeAgo;
   } else {
-    state.replies.push({ id: newId("r"), userId, votes, body });
+    state.replies.push({ id: newId("r"), userId, votes, body, timeAgo });
   }
   closeReplyModal();
   renderAll();
@@ -481,7 +527,8 @@ document.getElementById("file_load_gfw").addEventListener("change", e => {
           title: parsed.post.title ?? "Title",
           userId: parsed.post.userId ?? null,
           votes: parsed.post.votes ?? "",
-          body: parsed.post.body ?? ""
+          body: parsed.post.body ?? "",
+          timeAgo: getTimeAgoText(parsed.post.timeAgo)
         },
         replies: Array.isArray(parsed.replies) ? parsed.replies : []
       };

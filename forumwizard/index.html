@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Forum Wizard</title>
+<title>ForumWizard</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -49,7 +49,7 @@
     <div class="tab_content" id="tab_posts" hidden>
       <h3>Discussion Post</h3>
       <div class="field_group">
-        <label for="post_title">Group title</label>
+        <label for="post_title">Post title</label>
         <input type="text" id="post_title" maxlength="200">
       </div>
       <div class="field_group">
@@ -63,6 +63,10 @@
       <div class="field_group">
         <label for="post_body">Body <span class="hint">(Markdown supported)</span></label>
         <textarea id="post_body" rows="6"></textarea>
+      </div>
+      <div class="field_group">
+        <label for="post_time_ago">How long ago</label>
+        <input type="text" id="post_time_ago" placeholder="just now">
       </div>
 
       <hr class="divider">
@@ -157,6 +161,10 @@
       <div class="field_group">
         <label for="reply_body">Body <span class="hint">(Markdown supported)</span></label>
         <textarea id="reply_body" rows="6"></textarea>
+      </div>
+      <div class="field_group">
+        <label for="reply_time_ago">Reply time</label>
+        <input type="text" id="reply_time_ago" placeholder="just now">
       </div>
       <div class="modal_actions">
         <button type="button" class="micro_button" id="reply_modal_cancel">Cancel</button>
