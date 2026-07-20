@@ -6,13 +6,33 @@ const DEFAULT_AVATAR = "https://assets.genius.com/images/default_cover_image.png
 
 const ROLES = {
   contributor:     { label: "Contributor",     className: "contributor" },
-  verified_artist: { label: "Verified Artist", className: "verified_artist", checkmark: true },
+  verified_artist: { label: "Verified Artist", className: "verified_artist" },
   transcriber:     { label: "Transcriber",     className: "transcriber" },
   editor:          { label: "Editor",          className: "editor" },
   mediator:        { label: "Mediator",        className: "mediator" },
   moderator:       { label: "Moderator",       className: "moderator" },
   staff:           { label: "Staff",           className: "staff" },
 };
+
+const ROLE_ICON_SHAPES = {
+  contributor:     `<polygon points="5,1 10,9 0,9"></polygon>`,
+  verified_artist: `<circle cx="5" cy="5" r="5"></circle><path stroke-width="0.25" fill="#000" d="M4.43 7 2.25 4.968l.509-.546 1.634 1.524L7.136 3l.546.509L4.43 7Z"></path>`,
+  transcriber:     `<rect x="1" y="1" width="8" height="8"></rect>`,
+  editor:          `<path d="m5 0 1.43 3.1.1.23.25.04 3.22.46-2.33 2.35-.19.2.05.26L8.1 10 5.21 8.38 5 8.26l-.21.12L1.89 10l.58-3.36.05-.27-.19-.19L0 3.83l3.22-.46.24-.04.11-.24Z"></path>`,
+  mediator:        `<rect x="1" y="1" width="8" height="8"></rect>`,
+  moderator:       `<polygon points="5,0 10,5 5,10 0,5"></polygon>`,
+  staff:           `<circle cx="5" cy="5" r="5"></circle>`,
+};
+
+const ROLE_ICON_MIN_IQ = 300;
+
+function roleIconHtml(user, roleInfo) {
+  const iq = Number(user.iq) || 0;
+  if (iq < ROLE_ICON_MIN_IQ && roleInfo.className === "contributor") return ""; // Contributors with <300IQ should have no role icon
+  const shape = ROLE_ICON_SHAPES[roleInfo.className];
+  if (!shape) return "";
+  return `<span class="user_badge-role_icon user_badge-role_icon--${roleInfo.className}"><svg viewBox="0 0 10 10">${shape}</svg></span>`;
+}
 
 let uidCounter = 1;
 function newId(prefix) { return prefix + "_" + (uidCounter++) + "_" + Math.random().toString(36).slice(2, 7); }
@@ -134,7 +154,7 @@ function userBadgeHtml(user) {
       </div>
       <div class="user_details">
         <span class="login">${escapeHtml(user.name)}</span>
-        <div class="checky"></div>
+        ${roleIconHtml(user, roleInfo)}
         <p class="iq"><span class="iq_value">${formatIq(user.iq)}</span></p>
       </div>
     </div>`;
@@ -225,7 +245,7 @@ function renderUsersTab() {
   }
   list.innerHTML = state.users.map(u => {
     const roleInfo = ROLES[u.role] || ROLES.contributor;
-    const check = roleInfo.checkmark ? `<span class="mini_checky"></span>` : "";
+    const check = roleIconHtml(u, roleInfo);
     return `
       <div class="user_row" data-user-id="${u.id}">
         <img class="avatar" src="${escapeHtml(u.avatar || DEFAULT_AVATAR)}" onerror="this.src='${DEFAULT_AVATAR}'">
@@ -599,9 +619,5 @@ document.getElementById("btn_download_image").addEventListener("click", async ()
     setExportStatus("Couldn't render image: " + err.message);
   }
 });
-
-// ------------------------------------------------------------------
-// Init
-// ------------------------------------------------------------------
 
 renderAll();

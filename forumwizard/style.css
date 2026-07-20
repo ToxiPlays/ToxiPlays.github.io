@@ -14,11 +14,11 @@
   --downvote: #fe0236;
 
   --role-contributor: #ffffff;
-  --role-verified_artist: #79cc36;
+  --role-verified_artist: #ffff64; /* was #79cc36 — Genius moved Verified Artist to yellow */
   --role-transcriber: #ffa335;
-  --role-editor: #ffff64;
+  --role-editor: #d4aaff; /* was #ffff64 — Genius moved Editor to lavender */
   --role-mediator: #ff518c;
-  --role-moderator: #b780fe;
+  --role-moderator: #7689e8; /* was #b780fe — Genius's actual moderator color, forums was just lagging */
   --role-staff: #b0c4de;
 }
 
@@ -171,19 +171,26 @@ h1, h2, h3 { font-weight: 400; margin: 0; }
 .user_badge.staff .login,
 .user_badge.staff .user_details .login { color: var(--role-staff); }
 
-.user_badge .checky {
-  display: none;
-  height: 22px;
-  width: 14px;
+.user_badge-role_icon {
+  display: inline-block;
+  width: 12px;
+  height: 17px;
+  stroke: #000;
+  stroke-width: 1px;
   margin: 0 2px;
   position: relative;
-  top: 2px;
+  top: 1px;
   vertical-align: middle;
 }
-.user_badge.verified_artist .checky {
-  display: inline-block;
-  background: url("https://assets.genius.com/images/site-sprites-308bad2ba331705b832b9c892f3ead02a2a0ab1f.png") -631px -800px no-repeat;
-}
+.user_badge-role_icon svg { overflow: visible; display: block; }
+
+.user_badge-role_icon--contributor     { fill: var(--role-contributor); }
+.user_badge-role_icon--verified_artist { fill: var(--role-verified_artist); }
+.user_badge-role_icon--transcriber     { fill: var(--role-transcriber); }
+.user_badge-role_icon--editor          { fill: var(--role-editor); }
+.user_badge-role_icon--mediator        { fill: var(--role-mediator); }
+.user_badge-role_icon--moderator       { fill: var(--role-moderator); }
+.user_badge-role_icon--staff           { fill: var(--role-staff); }
 
 .user_details .iq {
   margin: 0;
@@ -350,13 +357,6 @@ h1, h2, h3 { font-weight: 400; margin: 0; }
   border-radius: 2px; padding: 4px 8px; font-size: 11px; cursor: pointer;
 }
 .user_row .user_row-actions button:hover { color: #fff; border-color: #777; }
-
-.mini_checky {
-  display: inline-block; width: 12px; height: 13px; vertical-align: middle;
-  background: url("https://assets.genius.com/images/site-sprites-308bad2ba331705b832b9c892f3ead02a2a0ab1f.png") -631px -800px no-repeat;
-  background-size: 40px auto;
-  transform: scale(0.9);
-}
 
 .reply_list { display: flex; flex-direction: column; gap: 10px; }
 .reply_row {
