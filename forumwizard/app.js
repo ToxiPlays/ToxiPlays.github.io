@@ -24,7 +24,7 @@ const ROLE_ICON_SHAPES = {
   staff:           `<circle cx="5" cy="5" r="5"></circle>`,
 };
 
-const ROLE_ICON_MIN_IQ = 300;
+const ROLE_ICON_MIN_IQ = 600;
 
 function roleIconHtml(user, roleInfo) {
   const iq = Number(user.iq) || 0;
