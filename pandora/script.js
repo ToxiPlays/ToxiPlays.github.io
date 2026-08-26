@@ -239,6 +239,19 @@ function loadTTML(ttmlKey) {
                         }
                     });
                     
+                    // Determine which lines start a new agent (for the name tag)
+                    currentLyrics.forEach((line, i) => {
+                        line.showAgentTag = i === 0 || line.agent !== currentLyrics[i - 1].agent;
+                    });
+
+                    if (!window.lyricsRenderer) {
+                        window.lyricsRenderer = new LyricsRenderer(
+                            document.getElementById('synced-lyrics'),
+                            document.getElementById('lyrics-viewport')
+                        );
+                    }
+                    window.lyricsRenderer.setLines(currentLyrics);
+
                     document.getElementById('synced-lyrics').classList.remove('hidden');
                 } catch (error) {
                     console.error('Error processing TTML:', error);
@@ -254,111 +267,314 @@ function loadTTML(ttmlKey) {
     });
 }
 
-function updateSyncedLyrics() {
-    if (!currentLyrics || currentLyrics.length === 0 || !wavesurfer) return;
-    
-    const currentTime = wavesurfer.getCurrentTime();
-    
-    // Find all lyrics that should be displayed (not just the current one)
-    const displayedLyrics = [];
-    for (const lyric of currentLyrics) {
-        if (currentTime >= lyric.begin && currentTime < lyric.end) {
-            displayedLyrics.push(lyric);
-        }
+/**
+ * LyricsRenderer draws lyric lines in a scrolling, context-aware box:
+ *  - all currently-active lines, plus up to 3 lines of context before/after
+ *  - the box re-centers so the combined center of the active lines sits at
+ *    the box's vertical center
+ *  - non-active context lines are blurred proportional to their distance
+ *    (in lines) from the active group
+ *  - the box grows past its 5em minimum only when the active lines
+ *    themselves don't fit, peeking half of the nearest context line
+ *  - during dead air the display freezes on the last-sung lines, then
+ *    eases (ease-in-out) into the next line over the last <=1s of the gap;
+ *    for near-immediate transitions (<0.5s gap) it eases out into the new
+ *    line over 10% of that line's duration, starting the instant it begins
+ *  - individual tokens rise from a -2px offset to 0px over their own span
+ */
+class LyricsRenderer {
+    constructor(boxEl, viewportEl) {
+        this.box = boxEl;
+        this.viewport = viewportEl;
+        this.minHeightEm = 5;
+        this.contextSpan = 3;
+        this.setLines([]);
     }
-    
-    const lyricsBox = document.getElementById('synced-lyrics');
-    const lyricsContainer = document.getElementById('current-lyric');
-    
-    if (displayedLyrics.length === 0) {
-        lyricsContainer.innerHTML = '';
-        return;
+
+    setLines(lines) {
+        this.lines = lines || [];
+        this.viewport.innerHTML = '';
+        this.groupEls = new Map(); // lineIndex -> { container, spans, bgSpans, isNew }
+        this.targetIndices = [];
+        this.targetKey = '';
+        this.lastNonEmptyIndices = [];
+        this.scrollArmed = false;
+        this.currentGapId = null;
+        this._lastTime = 0;
+        this.box.style.transition = 'none';
+        this.box.style.height = '';
+        void this.box.offsetHeight;
+        this.box.style.transition = '';
     }
-    
-    let html = '';
-    
-    // Track which agents we've shown names for on this screen
-    const agentsShownThisFrame = new Set();
-    
-    // Render each displayed lyric line
-    displayedLyrics.forEach((currentLyric, lineIndex) => {
-        const highlightColor = getAgentColor(currentLyric.agent);
-        
-        // Add line with appropriate styling
-        if (lineIndex > 0) {
-            html += '<br/>';
+
+    getRealActiveIndices(t) {
+        const out = [];
+        for (let i = 0; i < this.lines.length; i++) {
+            const l = this.lines[i];
+            if (t >= l.begin && t < l.end) out.push(i);
         }
-        
-        // Add agent name above the line if this is the first line from that agent on screen
-        if (!agentsShownThisFrame.has(currentLyric.agent) && currentLyric.agentName) {
-            html += `<span style="display: block; font-size: 0.75em; font-weight: 300; opacity: 0.7; margin-bottom: 4px; color: ${highlightColor};">${currentLyric.agentName}</span>`;
-            agentsShownThisFrame.add(currentLyric.agent);
+        return out;
+    }
+
+    // The next line(s) to start after time t (all lines sharing the nearest upcoming begin)
+    getNextGroup(t) {
+        let minBegin = Infinity;
+        for (const l of this.lines) {
+            if (l.begin > t && l.begin < minBegin) minBegin = l.begin;
         }
-        
-        // Render main line
-        for (let i = 0; i < currentLyric.mainSpans.length; i++) {
-            const spanData = currentLyric.mainSpans[i];
-            let style = '';
-            
-            if (currentTime >= spanData.begin && currentTime < spanData.end) {
-                // Currently singing
-                const timeInSpan = currentTime - spanData.begin;
-                const spanDuration = spanData.end - spanData.begin;
-                const progress = Math.max(0, Math.min(1, timeInSpan / spanDuration));
-                const gradientPercent = (progress * 100).toFixed(2);
-                style = `background: linear-gradient(90deg, ${highlightColor} 0%, ${highlightColor} ${gradientPercent}%, #333 ${gradientPercent}%, #333 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;`;
-            } else if (currentTime >= spanData.end) {
-                // Already sung
-                style = `color: ${highlightColor};`;
-            } else {
-                // Upcoming
-                style = 'color: #333;';
-            }
-            
-            html += `<span style="${style}">${spanData.text}</span>`;
-            
-            // Add space after span (preserve spacing from TTML)
-            if (spanData.hasTrailingSpace) {
-                html += ' ';
-            }
-        }
-        
-        // Render background spans (ad-libs) as a separate, smaller line below
-        if (currentLyric.bgSpans.length > 0) {
-            html += '<br/><span style="display: block; font-size: 0.75em; opacity: 0.85; margin-top: 6px;">';
-            
-            for (let i = 0; i < currentLyric.bgSpans.length; i++) {
-                const spanData = currentLyric.bgSpans[i];
-                let style = '';
-                
-                if (currentTime >= spanData.begin && currentTime < spanData.end) {
-                    // Currently singing
-                    const timeInSpan = currentTime - spanData.begin;
-                    const spanDuration = spanData.end - spanData.begin;
-                    const progress = Math.max(0, Math.min(1, timeInSpan / spanDuration));
-                    const gradientPercent = (progress * 100).toFixed(2);
-                    style = `background: linear-gradient(90deg, ${highlightColor} 0%, ${highlightColor} ${gradientPercent}%, #333 ${gradientPercent}%, #333 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;`;
-                } else if (currentTime >= spanData.end) {
-                    // Already sung
-                    style = `color: ${highlightColor};`;
+        if (minBegin === Infinity) return null;
+        const indices = [];
+        this.lines.forEach((l, i) => {
+            if (Math.abs(l.begin - minBegin) < 0.001) indices.push(i);
+        });
+        return { indices, begin: minBegin };
+    }
+
+    update(t) {
+        if (!this.lines.length) return;
+        this._lastTime = t;
+        const realActive = this.getRealActiveIndices(t);
+
+        if (realActive.length > 0) {
+            this.scrollArmed = false;
+            this.currentGapId = null;
+            this.lastNonEmptyIndices = realActive;
+
+            const realKey = realActive.join(',');
+            if (realKey !== this.targetKey) {
+                const alreadyCentered = this.targetIndices.length === realActive.length &&
+                    realActive.every(i => this.targetIndices.includes(i));
+                if (alreadyCentered) {
+                    // We already pre-scrolled here during the gap; just lock it in.
+                    this._applyTarget(realActive, 0.001, 'linear');
                 } else {
-                    // Upcoming
-                    style = 'color: #333;';
-                }
-                
-                html += `<span style="${style}">${spanData.text}</span>`;
-                
-                // Add space between background spans
-                if (spanData.hasTrailingSpace) {
-                    html += ' ';
+                    // No (or too little) dead air: ease out into the new line as it starts,
+                    // over 10% of its own duration.
+                    const lineDur = Math.max(...realActive.map(i => this.lines[i].end - this.lines[i].begin));
+                    const dur = Math.max(0.05, lineDur * 0.1);
+                    this._applyTarget(realActive, dur, 'ease-out');
                 }
             }
-            
-            html += '</span>';
+        } else {
+            const next = this.getNextGroup(t);
+            if (next) {
+                const gapStart = this.lastNonEmptyIndices.length
+                    ? Math.max(...this.lastNonEmptyIndices.map(i => this.lines[i].end))
+                    : 0;
+                this._maybeArmGapScroll(t, next, gapStart);
+            }
+            // else: trailing dead air after the last line - stay frozen on the last group.
         }
-    });
-    
-    lyricsContainer.innerHTML = html;
+
+        this._updateTokens(t);
+    }
+
+    _maybeArmGapScroll(t, next, gapStart) {
+        const gapId = next.indices.join(',');
+        if (this.currentGapId !== gapId) {
+            this.currentGapId = gapId;
+            this.scrollArmed = false;
+        }
+        const gapDuration = next.begin - gapStart;
+        if (gapDuration < 0.5) return; // handled by the ease-out-on-start path instead
+        if (this.scrollArmed) return;
+
+        const scrollDuration = Math.min(1, gapDuration);
+        const scrollStart = next.begin - scrollDuration;
+        if (t >= scrollStart) {
+            this.scrollArmed = true;
+            this._applyTarget(next.indices, scrollDuration, 'ease-in-out');
+        }
+    }
+
+    _applyTarget(indices, durationSeconds, easing) {
+        this.targetIndices = indices.slice();
+        this.targetKey = indices.join(',');
+        this._layout(indices, durationSeconds, easing);
+    }
+
+    _createLineElement(idx) {
+        const line = this.lines[idx];
+        const highlightColor = getAgentColor(line.agent);
+        const container = document.createElement('div');
+        container.className = 'lyric-line-group';
+
+        if (line.showAgentTag && line.agentName) {
+            const tag = document.createElement('span');
+            tag.className = 'lyric-agent-tag';
+            tag.style.color = highlightColor;
+            tag.textContent = line.agentName;
+            container.appendChild(tag);
+        }
+
+        const lineEl = document.createElement('p');
+        lineEl.className = 'lyric-line';
+        const spanRefs = [];
+
+        line.mainSpans.forEach(spanData => {
+            const el = document.createElement('span');
+            el.className = 'lyric-token';
+            el.textContent = spanData.text;
+            lineEl.appendChild(el);
+            spanRefs.push({ el, begin: spanData.begin, end: spanData.end, color: highlightColor });
+            if (spanData.hasTrailingSpace) lineEl.appendChild(document.createTextNode(' '));
+        });
+
+        const bgRefs = [];
+        if (line.bgSpans && line.bgSpans.length) {
+            const bgEl = document.createElement('span');
+            bgEl.className = 'bg-line';
+            line.bgSpans.forEach(spanData => {
+                const el = document.createElement('span');
+                el.className = 'lyric-token';
+                el.textContent = spanData.text;
+                bgEl.appendChild(el);
+                bgRefs.push({ el, begin: spanData.begin, end: spanData.end, color: highlightColor });
+                if (spanData.hasTrailingSpace) bgEl.appendChild(document.createTextNode(' '));
+            });
+            lineEl.appendChild(bgEl);
+        }
+
+        container.appendChild(lineEl);
+        this.viewport.appendChild(container);
+        this.groupEls.set(idx, { container, spans: spanRefs, bgSpans: bgRefs, isNew: true });
+    }
+
+    _layout(targetIndices, duration, easing) {
+        const n = this.lines.length;
+        const earliest = Math.min(...targetIndices);
+        const latest = Math.max(...targetIndices);
+
+        const windowIndices = [];
+        for (let i = Math.max(0, earliest - this.contextSpan); i < earliest; i++) windowIndices.push(i);
+        for (const i of targetIndices) windowIndices.push(i);
+        for (let i = latest + 1; i <= Math.min(n - 1, latest + this.contextSpan); i++) windowIndices.push(i);
+
+        // Drop anything that's fallen out of the window entirely
+        for (const [idx, entry] of Array.from(this.groupEls)) {
+            if (!windowIndices.includes(idx)) {
+                entry.container.remove();
+                this.groupEls.delete(idx);
+            }
+        }
+
+        // Ensure DOM elements exist so we can measure their natural height
+        for (const idx of windowIndices) {
+            if (!this.groupEls.has(idx)) this._createLineElement(idx);
+        }
+
+        // Natural (unshifted) stacking order, top to bottom
+        let cumTop = 0;
+        const tops = {};
+        const heights = {};
+        for (const idx of windowIndices) {
+            const el = this.groupEls.get(idx).container;
+            const h = el.offsetHeight;
+            heights[idx] = h;
+            tops[idx] = cumTop;
+            cumTop += h;
+        }
+
+        const activeTop = tops[earliest];
+        const activeBottom = tops[latest] + heights[latest];
+        const activeHeight = activeBottom - activeTop;
+        const activeCenter = (activeTop + activeBottom) / 2;
+
+        const minHeightPx = parseFloat(getComputedStyle(this.box).fontSize) * this.minHeightEm;
+        let boxHeight = minHeightPx;
+        if (activeHeight > minHeightPx) {
+            const beforeIdx = earliest - 1;
+            const afterIdx = latest + 1;
+            const peekTop = windowIndices.includes(beforeIdx) ? heights[beforeIdx] / 2 : 0;
+            const peekBottom = windowIndices.includes(afterIdx) ? heights[afterIdx] / 2 : 0;
+            boxHeight = activeHeight + peekTop + peekBottom;
+        }
+
+        const shift = boxHeight / 2 - activeCenter;
+        const transition = `transform ${duration}s ${easing}, opacity ${duration}s ${easing}, filter 0.4s ease`;
+
+        for (const idx of windowIndices) {
+            const entry = this.groupEls.get(idx);
+            const el = entry.container;
+            const finalTop = tops[idx] + shift;
+            const bottom = finalTop + heights[idx];
+            const isTarget = targetIndices.includes(idx);
+
+            // Fully-offscreen context lines aren't drawn at all
+            if (!isTarget && (bottom < 0 || finalTop > boxHeight)) {
+                el.remove();
+                this.groupEls.delete(idx);
+                continue;
+            }
+            if (!el.isConnected) this.viewport.appendChild(el);
+
+            let dist = 0;
+            if (idx < earliest) dist = earliest - idx;
+            else if (idx > latest) dist = idx - latest;
+
+            if (entry.isNew) {
+                el.style.transition = 'none';
+                el.style.transform = `translateY(${finalTop}px)`;
+                el.style.filter = `blur(${dist}px)`;
+                void el.offsetHeight; // force reflow so the "none" transition actually applies
+                el.style.transition = transition;
+                entry.isNew = false;
+            } else {
+                el.style.transition = transition;
+                el.style.transform = `translateY(${finalTop}px)`;
+                el.style.filter = `blur(${dist}px)`;
+            }
+        }
+
+        this.box.style.transition = `height ${duration}s ${easing}`;
+        this.box.style.height = `${boxHeight}px`;
+    }
+
+    _updateTokens(t) {
+        for (const entry of this.groupEls.values()) {
+            this._updateSpanGroup(entry.spans, t);
+            this._updateSpanGroup(entry.bgSpans, t);
+        }
+    }
+
+    _updateSpanGroup(spans, t) {
+        for (const s of spans) {
+            let progress;
+            if (t < s.begin) progress = 0;
+            else if (t >= s.end) progress = 1;
+            else progress = (t - s.begin) / (s.end - s.begin);
+
+            s.el.style.transform = `translateY(${-2 * (1 - progress)}px)`;
+
+            if (progress <= 0) {
+                s.el.style.background = 'none';
+                s.el.style.webkitTextFillColor = '';
+                s.el.style.color = '#333';
+            } else if (progress >= 1) {
+                s.el.style.background = 'none';
+                s.el.style.webkitTextFillColor = '';
+                s.el.style.color = s.color;
+            } else {
+                const pct = (progress * 100).toFixed(2);
+                s.el.style.color = '';
+                s.el.style.webkitTextFillColor = 'transparent';
+                s.el.style.background = `linear-gradient(90deg, ${s.color} 0%, ${s.color} ${pct}%, #333 ${pct}%, #333 100%)`;
+                s.el.style.backgroundClip = 'text';
+                s.el.style.webkitBackgroundClip = 'text';
+            }
+        }
+    }
+}
+
+function startLyricsLoop() {
+    if (lyricsAnimationFrameId) cancelAnimationFrame(lyricsAnimationFrameId);
+    const loop = () => {
+        if (wavesurfer && currentLyrics && window.lyricsRenderer) {
+            window.lyricsRenderer.update(wavesurfer.getCurrentTime());
+        }
+        lyricsAnimationFrameId = requestAnimationFrame(loop);
+    };
+    loop();
 }
 
 function getFile(key) {
@@ -621,6 +837,9 @@ async function stripTTMLBackgroundSpans(file) {
 function playTrack(index) {
     currentTrackIndex = index;
     const track = currentAlbum.tracks[index];
+    currentLyrics = null;
+    if (window.lyricsRenderer) window.lyricsRenderer.setLines([]);
+    document.getElementById('synced-lyrics').classList.add('hidden');
     if (track.file) {
         if (wavesurfer) wavesurfer.destroy();
         wavesurfer = WaveSurfer.create({
@@ -659,10 +878,6 @@ function playTrack(index) {
             // Update time display
             wavesurfer.on('audioprocess', (currentTime) => {
                 document.getElementById('current-time').textContent = formatTime(currentTime);
-                
-                if (currentLyrics) {
-                    updateSyncedLyrics();
-                }
             });
             
             preloadNext();
@@ -727,6 +942,7 @@ function closePlayer() {
     document.getElementById('audio-player').classList.add('hidden');
     document.getElementById('synced-lyrics').classList.add('hidden');
     currentLyrics = null;
+    if (window.lyricsRenderer) window.lyricsRenderer.setLines([]);
 }
 
 function editTrack(index) {
@@ -1256,3 +1472,4 @@ document.getElementById('export-btn').addEventListener('click', () => {
 });
 
 renderAlbums();
+startLyricsLoop();
