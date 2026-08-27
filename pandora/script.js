@@ -286,7 +286,7 @@ class LyricsRenderer {
     constructor(boxEl, viewportEl) {
         this.box = boxEl;
         this.viewport = viewportEl;
-        this.minHeightEm = 6;
+        this.minHeightEm = 5;
         this.contextSpan = 3;
         this.setLines([]);
     }
