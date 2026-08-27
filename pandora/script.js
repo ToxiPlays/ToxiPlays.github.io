@@ -286,7 +286,7 @@ class LyricsRenderer {
     constructor(boxEl, viewportEl) {
         this.box = boxEl;
         this.viewport = viewportEl;
-        this.minHeightEm = 5;
+        this.minHeightEm = 6;
         this.contextSpan = 3;
         this.setLines([]);
     }
@@ -437,7 +437,7 @@ class LyricsRenderer {
 
         container.appendChild(lineEl);
         this.viewport.appendChild(container);
-        this.groupEls.set(idx, { container, spans: spanRefs, bgSpans: bgRefs, isNew: true });
+        this.groupEls.set(idx, { container, spans: spanRefs, bgSpans: bgRefs, isNew: true, removalTimer: null });
     }
 
     _layout(targetIndices, duration, easing) {
@@ -450,26 +450,35 @@ class LyricsRenderer {
         for (const i of targetIndices) windowIndices.push(i);
         for (let i = latest + 1; i <= Math.min(n - 1, latest + this.contextSpan); i++) windowIndices.push(i);
 
-        // Drop anything that's fallen out of the window entirely
-        for (const [idx, entry] of Array.from(this.groupEls)) {
-            if (!windowIndices.includes(idx)) {
-                entry.container.remove();
+        // Lines still mounted from a previous layout that have now fallen outside the window
+        // don't vanish - they keep riding the same motion out and only get cleaned up once
+        // their exit transition has had time to actually finish, so the whole thing reads as
+        // one continuous scroll rather than lines popping in and out.
+        const bufferIndices = [];
+        for (const idx of this.groupEls.keys()) {
+            if (windowIndices.includes(idx)) continue;
+            const dist = idx < earliest ? earliest - idx : idx - latest;
+            if (dist <= this.contextSpan + 2) {
+                bufferIndices.push(idx);
+            } else {
+                // Safety net for a jump big enough to skip past the buffer entirely.
+                this.groupEls.get(idx).container.remove();
                 this.groupEls.delete(idx);
             }
         }
 
-        // Ensure DOM elements exist so we can measure their natural height
         for (const idx of windowIndices) {
             if (!this.groupEls.has(idx)) this._createLineElement(idx);
         }
 
-        // Natural (unshifted) stacking order, top to bottom
+        const layoutIndices = Array.from(new Set([...windowIndices, ...bufferIndices])).sort((a, b) => a - b);
+
+        // Natural (unshifted) stacking order, top to bottom, across window + still-exiting lines
         let cumTop = 0;
         const tops = {};
         const heights = {};
-        for (const idx of windowIndices) {
-            const el = this.groupEls.get(idx).container;
-            const h = el.offsetHeight;
+        for (const idx of layoutIndices) {
+            const h = this.groupEls.get(idx).container.offsetHeight;
             heights[idx] = h;
             tops[idx] = cumTop;
             cumTop += h;
@@ -493,41 +502,68 @@ class LyricsRenderer {
         const shift = boxHeight / 2 - activeCenter;
         const transition = `transform ${duration}s ${easing}, opacity ${duration}s ${easing}, filter 0.4s ease`;
 
-        for (const idx of windowIndices) {
+        for (const idx of layoutIndices) {
             const entry = this.groupEls.get(idx);
             const el = entry.container;
             const finalTop = tops[idx] + shift;
             const bottom = finalTop + heights[idx];
+            const isWindow = windowIndices.includes(idx);
             const isTarget = targetIndices.includes(idx);
 
-            // Fully-offscreen context lines aren't drawn at all
+            if (entry.removalTimer) {
+                clearTimeout(entry.removalTimer);
+                entry.removalTimer = null;
+            }
+
+            if (!isWindow) {
+                // Exiting: keep riding the same motion out of view, then clean up afterwards.
+                el.style.transition = transition;
+                el.style.transform = `translateY(${finalTop}px)`;
+                this._scheduleRemoval(idx, el, duration);
+                continue;
+            }
+
             if (!isTarget && (bottom < 0 || finalTop > boxHeight)) {
+                // A context line that would never actually be visible - just don't draw it.
                 el.remove();
                 this.groupEls.delete(idx);
                 continue;
             }
-            if (!el.isConnected) this.viewport.appendChild(el);
 
             let dist = 0;
             if (idx < earliest) dist = earliest - idx;
             else if (idx > latest) dist = idx - latest;
 
             if (entry.isNew) {
+                // Ease newly-entering lines in from just outside the box, in the direction
+                // they're entering from, so they join the same overall motion.
+                const startTop = idx > latest ? boxHeight : (idx < earliest ? -heights[idx] : finalTop);
                 el.style.transition = 'none';
-                el.style.transform = `translateY(${finalTop}px)`;
+                el.style.transform = `translateY(${startTop}px)`;
                 el.style.filter = `blur(${dist}px)`;
-                void el.offsetHeight; // force reflow so the "none" transition actually applies
-                el.style.transition = transition;
+                void el.offsetHeight; // force reflow so the jump to startTop actually applies first
                 entry.isNew = false;
-            } else {
-                el.style.transition = transition;
-                el.style.transform = `translateY(${finalTop}px)`;
-                el.style.filter = `blur(${dist}px)`;
             }
+
+            el.style.transition = transition;
+            el.style.transform = `translateY(${finalTop}px)`;
+            el.style.filter = `blur(${dist}px)`;
         }
 
         this.box.style.transition = `height ${duration}s ${easing}`;
         this.box.style.height = `${boxHeight}px`;
+    }
+
+    _scheduleRemoval(idx, el, duration) {
+        const entry = this.groupEls.get(idx);
+        if (!entry) return;
+        entry.removalTimer = setTimeout(() => {
+            const current = this.groupEls.get(idx);
+            if (current && current.container === el) {
+                el.remove();
+                this.groupEls.delete(idx);
+            }
+        }, Math.max(50, duration * 1000) + 80);
     }
 
     _updateTokens(t) {
@@ -544,7 +580,8 @@ class LyricsRenderer {
             else if (t >= s.end) progress = 1;
             else progress = (t - s.begin) / (s.end - s.begin);
 
-            s.el.style.transform = `translateY(${-2 * (1 - progress)}px)`;
+            const risenProgress = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+            s.el.style.transform = `translateY(${-2 * (1 - risenProgress)}px)`;
 
             if (progress <= 0) {
                 s.el.style.background = 'none';
