@@ -136,7 +136,7 @@ function getAgentColor(agent) {
     const match = agent.match(/v(\d+)/);
     if (match) {
         const versionNum = parseInt(match[1]);
-        const colorArray = ['#0087ff', '#ff1493', '#6a0dad', '#ffff99', '#006400', '#8b4513'];
+        const colorArray = ['#0087ff', '#ff1493', '#6a0dad', '#7e7aff', '#006400', '#8b4513', '#ce99ff', '#607d8b'];
         const loopedIndex = ((versionNum - 1) % colorArray.length);
         return colorArray[loopedIndex];
     }
