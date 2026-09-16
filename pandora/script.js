@@ -1010,11 +1010,6 @@ function editTrack(index) {
     const fileInput = document.getElementById('track-file-upload');
     const uploadBtn = document.getElementById('track-file-upload-btn');
     
-    uploadBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        fileInput.click();
-    });
-    
     fileInput.addEventListener('change', (e) => {
         const newFile = e.target.files[0];
         if (newFile) {
@@ -1051,6 +1046,42 @@ function editTrack(index) {
             fileInput.value = '';
         }
     });
+
+    uploadBtn.onclick = (e) => {
+        e.preventDefault();
+        fileInput.click();
+    };
+    
+    fileInput.onchange = (e) => {
+        const newFile = e.target.files[0];
+        if (!newFile) return;
+        if (!newFile.type.startsWith('audio/')) {
+            alert('Please select a valid audio file');
+            return;
+        }
+        if (track.fileKey) {
+            db.transaction(['files'], 'readwrite').objectStore('files').delete(track.fileKey);
+        }
+        track.file = newFile;
+        track.originalName = newFile.name;
+        track.fileKey = track.fileKey || `${currentAlbum.id}-${track.id}`;
+        storeFile(track.fileKey, newFile);
+        
+        const tempWs = WaveSurfer.create({
+            container: document.createElement('div'),
+            height: 1
+        });
+        const url = URL.createObjectURL(newFile);
+        tempWs.load(url);
+        tempWs.on('ready', () => {
+            track.duration = tempWs.getDuration();
+            tempWs.destroy();
+            saveToStorage();
+            fileNameEl.textContent = `Current: ${newFile.name}`;
+        });
+        
+        fileInput.value = '';
+    };
     
     document.getElementById('track-modal').classList.remove('hidden');
     document.getElementById('track-modal').classList.add('show');
@@ -1074,6 +1105,7 @@ function editTrack(index) {
         
         renderModalTracks();
         saveToStorage();
+        ttmlInput.value = '';
         closeModal('track-modal');
     };
 }
