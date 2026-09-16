@@ -1,8 +1,10 @@
+@import url('https://fonts.googleapis.com/css2?family=Arimo:ital,wght@0,400..700;1,400..700&display=swap');
+
 body {
-    font-family: Arial, sans-serif;
+    font-family: "Arimo", Arial, sans-serif;
     margin: 0;
     padding: 20px;
-    background-color: #f4f4f4;
+    background-color: #171213;
 }
 
 header {
@@ -10,6 +12,7 @@ header {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 20px;
+    color: #eee;
 }
 
 h1 {
@@ -19,7 +22,7 @@ h1 {
 .hamburger-btn {
     font-size: 24px;
     padding: 5px 15px;
-    background-color: #007bff;
+    background-color: #ff607a;
     color: white;
     border: none;
     border-radius: 5px;
@@ -27,7 +30,7 @@ h1 {
 }
 
 .hamburger-btn:hover {
-    background-color: #0056b3;
+    background-color: #b35161;
 }
 
 .menu {
@@ -36,7 +39,7 @@ h1 {
     right: 0;
     width: 250px;
     height: 100vh;
-    background-color: #ffffff;
+    background-color: #fffafa;
     box-shadow: -2px 0 5px rgba(0,0,0,0.2);
     z-index: 1000;
     transform: translateX(100%);
@@ -67,7 +70,7 @@ h1 {
 .menu button {
     margin: 10px 15px;
     padding: 10px 15px;
-    background-color: #007bff;
+    background-color: #ff607a;
     color: white;
     border: none;
     border-radius: 5px;
@@ -77,12 +80,12 @@ h1 {
 }
 
 .menu button:hover {
-    background-color: #0056b3;
+    background-color: #b35161;
 }
 
 button {
     padding: 10px 15px;
-    background-color: #007bff;
+    background-color: #ff607a;
     color: white;
     border: none;
     border-radius: 5px;
@@ -90,7 +93,7 @@ button {
 }
 
 button:hover {
-    background-color: #0056b3;
+    background-color: #b35161;
 }
 
 .hidden {
@@ -180,13 +183,13 @@ button:hover {
 }
 
 .modal-content {
-    background-color: #fefefe;
-    margin: 5% auto;
+    background-color: #f7f7f7;
+    margin: 3% auto;
     padding: 20px;
-    border: 1px solid #888;
+    border: 1px solid #ff959563;
     width: 80%;
     max-width: 600px;
-    border-radius: 5px;
+    border-radius: 0.4%;
     transition: all 0.3s ease;
     animation: floatUp 0.3s ease;
 }
@@ -536,7 +539,7 @@ button:hover {
     appearance: none;
     width: 15px;
     height: 15px;
-    background: #007bff;
+    background: #ff607a;
     cursor: pointer;
     border-radius: 50%;
 }
@@ -544,7 +547,7 @@ button:hover {
 .volume-slider::-moz-range-thumb {
     width: 15px;
     height: 15px;
-    background: #007bff;
+    background: #ff607a;
     cursor: pointer;
     border-radius: 50%;
     border: none;
@@ -647,18 +650,13 @@ button.active {
 
 #track-file-info {
     background: var(--color-background-secondary);
-    padding: 10px;
+    /* padding: 10px; */
     border-radius: 5px;
-    font-size: 13px;
-    color: var(--color-text-secondary);
+    /* font-size: 13px; */
+    /* color: var(--color-text-secondary); */
 }
 
 .track-file-btn {
-    background-color: #17a2b8;
     margin: 10px 0;
     width: 100%;
-}
-
-.track-file-btn:hover {
-    background-color: #138496;
 }
