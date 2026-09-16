@@ -678,14 +678,14 @@ function renderAlbums() {
             .filter(t => t.file && t.duration)
             .reduce((sum, t) => sum + t.duration, 0);
         
-        const durationStr = totalDuration > 0 ? ` (${formatTime(totalDuration)})` : '';
+        const durationStr = totalDuration > 0 ? ` • ${formatTime(totalDuration)}` : '';
         
         const card = document.createElement('div');
         card.className = 'album-card';
         card.innerHTML = `
             <img src="${album.cover || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiM5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5ObyBDb3ZlcjwvdGV4dD48L3N2Zz4='}" alt="Cover">
             <h3>${album.title}</h3>
-            <p>${album.tracks.length} tracks${durationStr}</p>
+            <p>${album.tracks.length} track${album.tracks.length === 1 ? "" : "s"}${durationStr}</p>
             <button class="delete-album-btn hidden">Delete</button>
         `;
         card.addEventListener('click', (e) => {
