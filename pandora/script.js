@@ -131,7 +131,7 @@ function setMediaSessionMetadata(track, album) {
 
     navigator.mediaSession.metadata = new MediaMetadata({
         title: track.name,
-        artist: track.producers || settings.defaultProducers || '',
+        artist: track.writers || settings.defaultWriters || 'Pandora\'s Box',
         album: album.title,
         artwork
     });
