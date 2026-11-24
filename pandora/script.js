@@ -117,6 +117,93 @@ function storeFile(key, file) {
     store.put(file, key);
 }
 
+// ---------- Media Session API ----------
+const hasMediaSession = 'mediaSession' in navigator;
+
+function setMediaSessionMetadata(track, album) {
+    if (!hasMediaSession) return;
+
+    const artwork = [];
+    if (album.cover) {
+        const type = album.cover.match(/^data:([^;]+)/)?.[1] || 'image/jpeg';
+        artwork.push({ src: album.cover, sizes: 'any', type });
+    }
+
+    navigator.mediaSession.metadata = new MediaMetadata({
+        title: track.name,
+        artist: track.producers || settings.defaultProducers || '',
+        album: album.title,
+        artwork
+    });
+}
+
+function setMediaSessionPlaybackState(state) {
+    // state: 'playing' | 'paused' | 'none'
+    if (hasMediaSession) navigator.mediaSession.playbackState = state;
+}
+
+function updateMediaSessionPosition() {
+    if (!hasMediaSession || !wavesurfer || !navigator.mediaSession.setPositionState) return;
+
+    const duration = wavesurfer.getDuration();
+    if (!isFinite(duration) || duration <= 0) return;
+
+    const position = Math.min(Math.max(wavesurfer.getCurrentTime(), 0), duration);
+    try {
+        navigator.mediaSession.setPositionState({ duration, playbackRate: 1, position });
+    } catch (e) {
+        // Ignore transient invalid-state errors
+    }
+}
+
+function seekTo(time) {
+    if (!wavesurfer) return;
+    const duration = wavesurfer.getDuration();
+    const t = Math.min(Math.max(time, 0), duration);
+    // WaveSurfer v7 uses setTime; v6 uses setCurrentTime
+    if (typeof wavesurfer.setTime === 'function') wavesurfer.setTime(t);
+    else wavesurfer.setCurrentTime(t);
+    updateMediaSessionPosition();
+}
+
+function registerMediaSessionHandlers() {
+    if (!hasMediaSession) return;
+
+    const handlers = {
+        play:          () => { if (wavesurfer && !wavesurfer.isPlaying()) wavesurfer.play(); },
+        pause:         () => { if (wavesurfer && wavesurfer.isPlaying()) wavesurfer.pause(); },
+        previoustrack: () => { if (currentAlbum) prevTrack(); },
+        nexttrack:     () => { if (currentAlbum) nextTrack(); },
+        seekbackward:  (d) => { if (wavesurfer) seekTo(wavesurfer.getCurrentTime() - (d.seekOffset || 10)); },
+        seekforward:   (d) => { if (wavesurfer) seekTo(wavesurfer.getCurrentTime() + (d.seekOffset || 10)); },
+        seekto:        (d) => { if (wavesurfer && d.seekTime != null) seekTo(d.seekTime); },
+        stop:          () => closePlayer()
+    };
+
+    for (const [action, handler] of Object.entries(handlers)) {
+        try {
+            navigator.mediaSession.setActionHandler(action, handler);
+        } catch (e) {
+            // This browser doesn't support this action; skip it
+        }
+    }
+}
+
+function clearMediaSession() {
+    if (!hasMediaSession) return;
+    navigator.mediaSession.metadata = null;
+    navigator.mediaSession.playbackState = 'none';
+    for (const action of ['play', 'pause', 'previoustrack', 'nexttrack',
+                          'seekbackward', 'seekforward', 'seekto', 'stop']) {
+        try { navigator.mediaSession.setActionHandler(action, null); } catch (e) {}
+    }
+}
+
+function updatePlayPauseLabel() {
+    document.getElementById('play-pause-btn').textContent =
+        wavesurfer && wavesurfer.isPlaying() ? 'Pause' : 'Play';
+}
+
 // Map agent IDs (v1, v2, v3, etc.) to highlight colors
 const agentColors = {
     v1: '#0087ff',      // Current (blue)
@@ -876,6 +963,7 @@ function playTrack(index) {
     const track = currentAlbum.tracks[index];
     currentLyrics = null;
     if (window.lyricsRenderer) window.lyricsRenderer.setLines([]);
+    clearMediaSession();
     document.getElementById('synced-lyrics').classList.add('hidden');
     if (track.file) {
         if (wavesurfer) wavesurfer.destroy();
@@ -887,6 +975,15 @@ function playTrack(index) {
             responsive: true,
             scrollParent: true
         });
+        wavesurfer.on('play', () => {
+            setMediaSessionPlaybackState('playing');
+            updatePlayPauseLabel();
+        });
+        wavesurfer.on('pause', () => {
+            setMediaSessionPlaybackState('paused');
+            updatePlayPauseLabel();
+        });
+        wavesurfer.on('seeking', updateMediaSessionPosition);
         const url = URL.createObjectURL(track.file);
         loadStartTime = Date.now();
         wavesurfer.load(url);
@@ -897,6 +994,8 @@ function playTrack(index) {
 
             const duration = wavesurfer.getDuration();
             track.duration = duration;
+            setMediaSessionMetadata(track, currentAlbum);
+            updateMediaSessionPosition();
             
             const volumeValue = document.getElementById('volume-slider').value;
             wavesurfer.setVolume(volumeValue / 100);
@@ -915,6 +1014,7 @@ function playTrack(index) {
             // Update time display
             wavesurfer.on('audioprocess', (currentTime) => {
                 document.getElementById('current-time').textContent = formatTime(currentTime);
+                updateMediaSessionPosition();
             });
             
             preloadNext();
@@ -1335,7 +1435,6 @@ document.getElementById('volume-slider').addEventListener('input', (e) => {
 document.getElementById('play-pause-btn').addEventListener('click', () => {
     if (wavesurfer) {
         wavesurfer.playPause();
-        document.getElementById('play-pause-btn').textContent = wavesurfer.isPlaying() ? 'Pause' : 'Play';
     }
 });
 
@@ -1503,5 +1602,6 @@ document.getElementById('export-btn').addEventListener('click', () => {
     a.click();
 });
 
+registerMediaSessionHandlers();
 renderAlbums();
 startLyricsLoop();
